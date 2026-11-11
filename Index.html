@@ -1,0 +1,2073 @@
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  signInWithCustomToken, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  collection 
+} from 'firebase/firestore';
+import { 
+  Shield, 
+  Heart, 
+  Zap, 
+  Brain, 
+  Plus, 
+  Trash2, 
+  Dices, 
+  Swords, 
+  Sparkles, 
+  Package, 
+  User, 
+  Users, 
+  Copy, 
+  Check, 
+  ExternalLink,
+  ChevronDown, 
+  ChevronUp, 
+  RefreshCw,
+  Skull,
+  Radio,
+  FileText,
+  Search,
+  MessageSquare
+} from 'lucide-react';
+
+// --- FIREBASE INITIALIZATION ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "demo-key",
+      authDomain: "demo.firebaseapp.com",
+      projectId: "demo-project",
+      storageBucket: "demo.appspot.com",
+      messagingSenderId: "123456789",
+      appId: "1:123456789:web:abcdef"
+    };
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'ordem-paranormal-sheets';
+
+// --- OFICIAIS DE ORDEM PARANORMAL: PERÍCIAS ---
+const SKILLS_LIST = [
+  { name: 'Acrobacia', attr: 'AGI', onlyTrained: false },
+  { name: 'Adestramento', attr: 'PRE', onlyTrained: true },
+  { name: 'Artes', attr: 'PRE', onlyTrained: true },
+  { name: 'Atletismo', attr: 'FOR', onlyTrained: false },
+  { name: 'Atualidades', attr: 'INT', onlyTrained: false },
+  { name: 'Ciências', attr: 'INT', onlyTrained: true },
+  { name: 'Crime', attr: 'AGI', onlyTrained: true },
+  { name: 'Diplomacia', attr: 'PRE', onlyTrained: false },
+  { name: 'Enganação', attr: 'PRE', onlyTrained: false },
+  { name: 'Fortitude', attr: 'VIG', onlyTrained: false },
+  { name: 'Furtividade', attr: 'AGI', onlyTrained: false },
+  { name: 'Iniciativa', attr: 'AGI', onlyTrained: false },
+  { name: 'Intimidação', attr: 'PRE', onlyTrained: false },
+  { name: 'Intuição', attr: 'PRE', onlyTrained: false },
+  { name: 'Investigação', attr: 'INT', onlyTrained: false },
+  { name: 'Luta', attr: 'FOR', onlyTrained: false },
+  { name: 'Medicina', attr: 'INT', onlyTrained: false },
+  { name: 'Ocultismo', attr: 'INT', onlyTrained: true },
+  { name: 'Percepção', attr: 'PRE', onlyTrained: false },
+  { name: 'Pilotagem', attr: 'AGI', onlyTrained: true },
+  { name: 'Pontaria', attr: 'AGI', onlyTrained: false },
+  { name: 'Profissão', attr: 'INT', onlyTrained: true },
+  { name: 'Reflexos', attr: 'AGI', onlyTrained: false },
+  { name: 'Religião', attr: 'PRE', onlyTrained: true },
+  { name: 'Sobrevivência', attr: 'INT', onlyTrained: false },
+  { name: 'Tática', attr: 'INT', onlyTrained: true },
+  { name: 'Tecnologia', attr: 'INT', onlyTrained: true },
+  { name: 'Vontade', attr: 'PRE', onlyTrained: false },
+];
+
+const TRAINING_LEVELS = [
+  { label: 'Destreinado', bonus: 0 },
+  { label: 'Treinado (+5)', bonus: 5 },
+  { label: 'Veterano (+10)', bonus: 10 },
+  { label: 'Expert (+15)', bonus: 15 },
+];
+
+// Modelo de Novo Agente Padrão
+const createDefaultAgent = (name = 'Novo Agente', player = 'Jogador') => ({
+  id: 'agent_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+  name,
+  player,
+  origin: 'Acadêmico',
+  class: 'Combatente',
+  nex: 5,
+  patente: 'Recruta',
+  prestigio: 0,
+  deslocamento: '9m',
+  // Atributos
+  attributes: {
+    AGI: 1,
+    FOR: 2,
+    INT: 1,
+    PRE: 1,
+    VIG: 2
+  },
+  // Vitais
+  pv: { current: 20, max: 20 },
+  pe: { current: 4, max: 4 },
+  san: { current: 12, max: 12 },
+  // Defesa
+  defense: {
+    base: 10,
+    armorBonus: 0,
+    otherBonus: 0,
+    resistances: 'Corte 2, Balístico 2'
+  },
+  // Perícias
+  skills: SKILLS_LIST.reduce((acc, skill) => {
+    acc[skill.name] = { training: 0, bonus: 0 };
+    return acc;
+  }, {}),
+  // Ataques
+  attacks: [
+    { id: 'att_1', name: 'Glock 17', test: 'Pontaria', damage: '2d6', crit: '19/x3', range: 'Curto', special: 'Balístico' },
+    { id: 'att_2', name: 'Faca Tática', test: 'Luta', damage: '1d4+2', crit: '19/x2', range: 'Corpo a corpo', special: 'Corte' }
+  ],
+  // Rituais e Habilidades
+  rituals: [
+    { id: 'rit_1', name: 'Ataque Especial', cost: '2 PE', circle: 'Habilidade', page: 'p. 24', dt: '', desc: 'Você gasta 2 PE para receber +5 no teste de ataque ou na rolagem de dano.' }
+  ],
+  dtRituals: 13,
+  // Inventário
+  inventory: [
+    { id: 'inv_1', name: 'Pistola Glock', category: 'I', spaces: 1, desc: 'Pente com 15 balas 9mm' },
+    { id: 'inv_2', name: 'Vestimenta de Proteção Leve', category: 'I', spaces: 2, desc: '+2 na Defesa' },
+    { id: 'inv_3', name: 'Kit de Perícia (Medicina)', category: 'I', spaces: 1, desc: 'Permite testes sem penalidade' },
+  ],
+  itemLimits: { cat1: 2, cat2: 1, cat3: 0, cat4: 0 },
+  creditLimit: 'Baixo',
+  // Roleplay
+  appearance: 'Roupas táticas escuras com o brasão oculto da Ordo Realitas. Olhar compenetrado.',
+  personality: 'Pragmático, calmo sob pressão, protetor dos aliados.',
+  history: 'Sobreviveu a um encontro inexplicable no interior do Piauí antes de ser recrutado.',
+  objective: 'Descobrir a origem da anomalia temporal de Novo Nilo.'
+});
+
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [roomId, setRoomId] = useState('novo-nilo');
+  const [roomInput, setRoomInput] = useState('novo-nilo');
+  const [characters, setCharacters] = useState([]);
+  const [selectedCharId, setSelectedCharId] = useState(null);
+  const [activeTab, setActiveTab] = useState('geral'); // 'geral', 'pericias', 'combate', 'rituais', 'inventario', 'bio'
+  const [diceHistory, setDiceHistory] = useState([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isNewCharModalOpen, setIsNewCharModalOpen] = useState(false);
+  const [newCharName, setNewCharName] = useState('');
+  const [newCharPlayer, setNewCharPlayer] = useState('');
+  const [newCharClass, setNewCharClass] = useState('Combatente');
+  const [customDiceQty, setCustomDiceQty] = useState(1);
+  const [customDiceSides, setCustomDiceSides] = useState(20);
+  const [customDiceBonus, setCustomDiceBonus] = useState(0);
+
+  const historyEndRef = useRef(null);
+
+  // 1. Setup Firebase Auth
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth error:", err);
+      }
+    };
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Escutar Dados da Sala (Personagens e Histórico de Dados)
+  useEffect(() => {
+    if (!user) return;
+
+    // Escutar lista de Personagens da Sala
+    const cleanRoom = roomId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'default-room';
+    const charCollection = collection(db, 'artifacts', appId, 'public', 'data', `rooms_${cleanRoom}_chars`);
+    
+    const unsubChars = onSnapshot(charCollection, (snapshot) => {
+      const list = [];
+      snapshot.forEach((docSnap) => {
+        list.push({ ...docSnap.data(), id: docSnap.id });
+      });
+
+      // Ordenar por nome
+      list.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setCharacters(list);
+
+      // Se não tem personagem selecionado ou o selecionado sumiu, selecione o primeiro
+      if (list.length > 0) {
+        setSelectedCharId(prev => {
+          if (!prev || !list.some(c => c.id === prev)) {
+            return list[0].id;
+          }
+          return prev;
+        });
+      } else {
+        setSelectedCharId(null);
+      }
+    }, (error) => {
+      console.error("Erro ao carregar personagens:", error);
+    });
+
+    // Escutar Histórico de Dados da Sala
+    const diceCollection = collection(db, 'artifacts', appId, 'public', 'data', `rooms_${cleanRoom}_rolls`);
+    const unsubDice = onSnapshot(diceCollection, (snapshot) => {
+      const rolls = [];
+      snapshot.forEach((docSnap) => {
+        rolls.push({ ...docSnap.data(), id: docSnap.id });
+      });
+      // Ordenar por timestamp em memória (RULE 2: sem complex queries)
+      rolls.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      setDiceHistory(rolls.slice(-40)); // manter últimos 40
+    }, (error) => {
+      console.error("Erro ao carregar rolagens:", error);
+    });
+
+    return () => {
+      unsubChars();
+      unsubDice();
+    };
+  }, [user, roomId]);
+
+  // Rolar para o final do log de dados automaticamente
+  useEffect(() => {
+    if (isSidebarOpen && historyEndRef.current) {
+      historyEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [diceHistory, isSidebarOpen]);
+
+  // Personagem Selecionado Atualmente
+  const currentChar = useMemo(() => {
+    return characters.find(c => c.id === selectedCharId) || null;
+  }, [characters, selectedCharId]);
+
+  // Toast Helper
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // Atualizar Personagem em Tempo Real no Firestore
+  const updateCharacterField = async (pathOrUpdater) => {
+    if (!currentChar || !user) return;
+    try {
+      const cleanRoom = roomId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'default-room';
+      const charRef = doc(db, 'artifacts', appId, 'public', 'data', `rooms_${cleanRoom}_chars`, currentChar.id);
+      
+      let updatedData = { ...currentChar };
+      if (typeof pathOrUpdater === 'function') {
+        updatedData = pathOrUpdater(updatedData);
+      } else if (typeof pathOrUpdater === 'object') {
+        updatedData = { ...updatedData, ...pathOrUpdater };
+      }
+      updatedData.lastUpdated = Date.now();
+      await setDoc(charRef, updatedData);
+    } catch (err) {
+      console.error("Erro ao salvar personagem:", err);
+      showToast("Erro ao sincronizar alteração!");
+    }
+  };
+
+  // Criar Novo Personagem
+  const handleCreateNewCharacter = async () => {
+    if (!newCharName.trim() || !user) return;
+    try {
+      const cleanRoom = roomId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'default-room';
+      const newAgent = createDefaultAgent(newCharName.trim(), newCharPlayer.trim() || 'Jogador');
+      newAgent.class = newCharClass;
+      
+      // Ajuste rápido de PV/PE/SAN de acordo com a classe
+      if (newCharClass === 'Combatente') {
+        newAgent.pv = { current: 20, max: 20 };
+        newAgent.pe = { current: 2, max: 2 };
+        newAgent.san = { current: 12, max: 12 };
+      } else if (newCharClass === 'Especialista') {
+        newAgent.pv = { current: 16, max: 16 };
+        newAgent.pe = { current: 3, max: 3 };
+        newAgent.san = { current: 16, max: 16 };
+      } else if (newCharClass === 'Ocultista') {
+        newAgent.pv = { current: 12, max: 12 };
+        newAgent.pe = { current: 4, max: 4 };
+        newAgent.san = { current: 20, max: 20 };
+      }
+
+      const charRef = doc(db, 'artifacts', appId, 'public', 'data', `rooms_${cleanRoom}_chars`, newAgent.id);
+      await setDoc(charRef, newAgent);
+      setSelectedCharId(newAgent.id);
+      setIsNewCharModalOpen(false);
+      setNewCharName('');
+      setNewCharPlayer('');
+      showToast(`Agente "${newAgent.name}" adicionado à mesa!`);
+    } catch (err) {
+      console.error("Erro ao criar:", err);
+      showToast("Falha ao criar ficha.");
+    }
+  };
+
+  // Excluir Personagem
+  const handleDeleteCharacter = async (charId, name) => {
+    if (!user) return;
+    try {
+      const cleanRoom = roomId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'default-room';
+      const charRef = doc(db, 'artifacts', appId, 'public', 'data', `rooms_${cleanRoom}_chars`, charId);
+      await deleteDoc(charRef);
+      showToast(`Agente ${name} removido da mesa.`);
+    } catch (err) {
+      console.error("Erro ao deletar:", err);
+    }
+  };
+
+  // Enviar Rolagem de Dado Sincronizada
+  const sendDiceRoll = async (rollData) => {
+    if (!user) return;
+    try {
+      const cleanRoom = roomId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_') || 'default-room';
+      const rollId = 'roll_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
+      const rollRef = doc(db, 'artifacts', appId, 'public', 'data', `rooms_${cleanRoom}_rolls`, rollId);
+      await setDoc(rollRef, {
+        ...rollData,
+        timestamp: Date.now(),
+        sender: currentChar?.name || 'Mestre / Anônimo',
+        player: currentChar?.player || user.uid.substring(0, 6)
+      });
+    } catch (err) {
+      console.error("Erro ao enviar rolagem:", err);
+    }
+  };
+
+  // Rolador de Atributo de Ordem Paranormal (Rola Atributo d20, escolhe o maior; se 0 ou negativo, rola 2d20 e escolhe o menor)
+  const rollAttribute = (attrName, attrValue) => {
+    const val = parseInt(attrValue) || 0;
+    const rolls = [];
+    let finalValue = 0;
+    let description = '';
+
+    if (val <= 0) {
+      // Regra de atributo 0: rola 2 dados e pega o menor
+      const d1 = Math.floor(Math.random() * 20) + 1;
+      const d2 = Math.floor(Math.random() * 20) + 1;
+      rolls.push(d1, d2);
+      finalValue = Math.min(d1, d2);
+      description = `Desvantagem (Atributo 0) [${d1}, ${d2}] ➔ Pior: ${finalValue}`;
+    } else {
+      for (let i = 0; i < val; i++) {
+        rolls.push(Math.floor(Math.random() * 20) + 1);
+      }
+      finalValue = Math.max(...rolls);
+      description = `Rola ${val}d20 [${rolls.join(', ')}] ➔ Maior: ${finalValue}`;
+    }
+
+    sendDiceRoll({
+      title: `Teste de ${attrName}`,
+      result: finalValue,
+      detail: description,
+      type: 'attribute'
+    });
+    showToast(`Rolou ${attrName}: ${finalValue}`);
+  };
+
+  // Rolador de Perícia de Ordem Paranormal
+  const rollSkill = (skill) => {
+    if (!currentChar) return;
+    const attrKey = skill.attr;
+    const attrVal = parseInt(currentChar.attributes[attrKey]) || 0;
+    const skillData = currentChar.skills[skill.name] || { training: 0, bonus: 0 };
+    const bonus = (parseInt(skillData.training) || 0) + (parseInt(skillData.bonus) || 0);
+
+    const rolls = [];
+    let bestDice = 0;
+    let detailStr = '';
+
+    if (attrVal <= 0) {
+      const d1 = Math.floor(Math.random() * 20) + 1;
+      const d2 = Math.floor(Math.random() * 20) + 1;
+      rolls.push(d1, d2);
+      bestDice = Math.min(d1, d2);
+      detailStr = `2d20 (menor) [${d1}, ${d2}] = ${bestDice} + ${bonus}`;
+    } else {
+      for (let i = 0; i < attrVal; i++) {
+        rolls.push(Math.floor(Math.random() * 20) + 1);
+      }
+      bestDice = Math.max(...rolls);
+      detailStr = `${attrVal}d20 [${rolls.join(', ')}] ➔ Maior: ${bestDice} + ${bonus}`;
+    }
+
+    const total = bestDice + bonus;
+    const isCrit = bestDice === 20;
+
+    sendDiceRoll({
+      title: `Perícia: ${skill.name} (${attrKey})`,
+      result: total,
+      detail: detailStr,
+      isCrit,
+      type: 'skill'
+    });
+    showToast(`Teste de ${skill.name}: ${total}`);
+  };
+
+  // Rolador de Dano / Expressão Livre
+  const rollDamageOrCustom = (title, formula = '1d6') => {
+    try {
+      // Suporte simples para formato "XdY + Z" ou "XdY"
+      const match = formula.replace(/\s+/g, '').match(/^(\d+)d(\d+)([+-]\d+)?$/i);
+      if (match) {
+        const qty = parseInt(match[1]);
+        const sides = parseInt(match[2]);
+        const modifier = match[3] ? parseInt(match[3]) : 0;
+        const rolls = [];
+        let sum = 0;
+        for (let i = 0; i < qty; i++) {
+          const r = Math.floor(Math.random() * sides) + 1;
+          rolls.push(r);
+          sum += r;
+        }
+        const total = sum + modifier;
+        const detail = `${qty}d${sides} [${rolls.join(' + ')}] ${modifier ? (modifier > 0 ? `+ ${modifier}` : `- ${Math.abs(modifier)}`) : ''}`;
+        sendDiceRoll({
+          title: `Dano: ${title}`,
+          result: total,
+          detail,
+          type: 'damage'
+        });
+        showToast(`${title}: ${total}`);
+      } else {
+        // Rolar padrão 1d20 se a fórmula for complexa
+        const r = Math.floor(Math.random() * 20) + 1;
+        sendDiceRoll({
+          title,
+          result: r,
+          detail: `Rolagem avulsa: ${r}`,
+          type: 'custom'
+        });
+      }
+    } catch {
+      showToast("Fórmula de rolagem inválida!");
+    }
+  };
+
+  // Carga Máxima calculada (base: 5 * Força, ou mínimo 2 se Força for 0)
+  const maxCapacity = useMemo(() => {
+    if (!currentChar) return 10;
+    const f = parseInt(currentChar.attributes.FOR) || 0;
+    return f > 0 ? f * 5 : 2;
+  }, [currentChar]);
+
+  // Carga Atual
+  const currentLoad = useMemo(() => {
+    if (!currentChar || !currentChar.inventory) return 0;
+    return currentChar.inventory.reduce((sum, it) => sum + (Number(it.spaces) || 0), 0);
+  }, [currentChar]);
+
+  return (
+    <div className="min-h-screen bg-[#0a0c0f] text-[#d6d9e0] font-sans flex flex-col selection:bg-amber-700 selection:text-white">
+      {/* TOAST FLUTUANTE */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 bg-[#161a22] border-2 border-amber-600/80 text-amber-200 px-5 py-3 rounded-lg shadow-2xl flex items-center gap-3 animate-bounce">
+          <Sparkles className="w-5 h-5 text-amber-500 animate-spin" />
+          <span className="font-semibold text-sm tracking-wide">{toastMessage}</span>
+        </div>
+      )}
+
+      {/* CABEÇALHO SUPERIOR / GERENCIAMENTO DE MESA */}
+      <header className="bg-[#10141d] border-b border-white/10 px-4 py-3 sticky top-0 z-40 shadow-lg">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          {/* Logo e Nome da Ordo */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-md bg-gradient-to-br from-amber-600 via-zinc-800 to-black p-0.5 flex items-center justify-center shadow-inner">
+              <Skull className="w-6 h-6 text-amber-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold tracking-widest text-base sm:text-lg text-amber-400 font-mono">ORDO REALITAS</span>
+                <span className="text-[10px] bg-red-950/80 border border-red-600/50 text-red-300 px-1.5 py-0.5 rounded font-mono font-bold tracking-wider">SIGILO</span>
+              </div>
+              <p className="text-xs text-zinc-400 hidden sm:block">Terminal Operacional de Fichas Colaborativas</p>
+            </div>
+          </div>
+
+          {/* Seletor de Sala Compartilhada */}
+          <div className="flex items-center gap-2 bg-[#0a0c0f] border border-white/10 px-3 py-1.5 rounded-lg">
+            <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+            <span className="text-xs text-zinc-400 font-mono">SALA:</span>
+            <input 
+              type="text" 
+              value={roomInput}
+              onChange={(e) => setRoomInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && setRoomId(roomInput)}
+              placeholder="Código da Sala..."
+              className="bg-transparent border-b border-zinc-700 focus:border-amber-500 outline-none text-xs text-amber-300 font-mono w-24 sm:w-32 uppercase"
+            />
+            {roomInput !== roomId && (
+              <button 
+                onClick={() => setRoomId(roomInput)}
+                className="bg-amber-600 hover:bg-amber-500 text-black px-2 py-0.5 rounded text-[11px] font-bold"
+              >
+                Entrar
+              </button>
+            )}
+            <button 
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                setCopiedLink(true);
+                setTimeout(() => setCopiedLink(false), 2000);
+                showToast("Link da mesa copiado!");
+              }}
+              title="Copiar link da mesa"
+              className="p-1 hover:text-amber-400 text-zinc-400 transition"
+            >
+              {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {/* Botões Direita: Log de Dados & Novo Personagem */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="flex items-center gap-2 bg-[#1c2230] hover:bg-[#252d40] border border-amber-600/40 text-amber-300 px-3 py-1.5 rounded-lg text-xs font-semibold transition"
+            >
+              <Dices className="w-4 h-4 text-amber-400" />
+              <span>Rolagens ({diceHistory.length})</span>
+            </button>
+
+            <button
+              onClick={() => setIsNewCharModalOpen(true)}
+              className="flex items-center gap-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-black px-3.5 py-1.5 rounded-lg text-xs font-bold shadow-md transition transform active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Novo Agente</span>
+            </button>
+          </div>
+        </div>
+
+        {/* BARRA DE SELEÇÃO RÁPIDA DE PERSONAGENS DA MESA */}
+        <div className="max-w-7xl mx-auto mt-3 pt-2 border-t border-white/5 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          <span className="text-[11px] text-zinc-400 uppercase tracking-wider font-mono flex items-center gap-1 shrink-0">
+            <Users className="w-3.5 h-3.5 text-amber-500" />
+            Agentes ({characters.length}):
+          </span>
+
+          {characters.length === 0 ? (
+            <span className="text-xs text-zinc-400 italic">Nenhum agente registrado nesta sala. Clique em "+ Novo Agente"!</span>
+          ) : (
+            characters.map((char) => {
+              const isSelected = char.id === selectedCharId;
+              return (
+                <button
+                  key={char.id}
+                  onClick={() => setSelectedCharId(char.id)}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition shrink-0 border ${
+                    isSelected 
+                      ? 'bg-amber-950/40 border-amber-500/80 text-amber-200 shadow-[0_0_12px_rgba(217,119,6,0.25)]' 
+                      : 'bg-[#141822] border-white/5 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+                  }`}
+                >
+                  <div className={`w-2 h-2 rounded-full ${isSelected ? 'bg-amber-400 animate-ping' : 'bg-zinc-600'}`} />
+                  <span className="font-bold">{char.name || 'Sem Nome'}</span>
+                  <span className="text-[10px] opacity-70 font-mono">({char.class?.slice(0, 4) || 'N/A'})</span>
+                  <span className="text-[10px] px-1 bg-red-950/60 text-red-300 rounded font-mono">
+                    {char.pv?.current}/{char.pv?.max}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </header>
+
+      {/* CONTEÚDO PRINCIPAL: FICHA DO PERSONAGEM OU VAZIO */}
+      <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 flex-1 flex flex-col">
+        {!currentChar ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-zinc-800 rounded-2xl bg-[#0e121a]/50 my-auto">
+            <Skull className="w-16 h-16 text-zinc-700 mb-4 animate-pulse" />
+            <h2 className="text-xl font-bold text-zinc-300 mb-2">Nenhum Agente Selecionado</h2>
+            <p className="text-sm text-zinc-400 max-w-md mb-6">
+              Para começar a jogar nesta sala compartilhada, adicione um novo personagem ou aguarde seus companheiros conectarem.
+            </p>
+            <button
+              onClick={() => setIsNewCharModalOpen(true)}
+              className="bg-amber-600 hover:bg-amber-500 text-black px-6 py-2.5 rounded-xl font-bold text-sm shadow-xl transition flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Criar Primeiro Agente
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* CABEÇALHO DA FICHA (Estilo Oficial Ordem Paranormal) */}
+            <div className="bg-[#121620] border border-amber-600/30 rounded-xl p-4 sm:p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-48 h-48 bg-amber-600/5 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4 mb-4">
+                <div className="flex-1 min-w-[240px]">
+                  <label className="text-[10px] uppercase font-mono tracking-widest text-amber-400 block">NOME DO AGENTE</label>
+                  <input
+                    type="text"
+                    value={currentChar.name || ''}
+                    onChange={(e) => updateCharacterField(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full bg-transparent text-xl sm:text-2xl font-black text-white focus:outline-none focus:border-b-2 border-amber-500 tracking-wide font-serif"
+                    placeholder="Nome do Personagem..."
+                  />
+                </div>
+
+                <div className="flex-1 min-w-[180px]">
+                  <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-400 block">JOGADOR</label>
+                  <input
+                    type="text"
+                    value={currentChar.player || ''}
+                    onChange={(e) => updateCharacterField(prev => ({ ...prev, player: e.target.value }))}
+                    className="w-full bg-transparent text-sm sm:text-base font-medium text-zinc-200 focus:outline-none focus:border-b border-amber-500"
+                    placeholder="Seu nome..."
+                  />
+                </div>
+
+                {/* Botão de Excluir Personagem */}
+                <button
+                  onClick={() => {
+                    if (window.confirm ? true : true) {
+                      handleDeleteCharacter(currentChar.id, currentChar.name);
+                    }
+                  }}
+                  title="Remover personagem da mesa"
+                  className="text-zinc-600 hover:text-red-400 transition p-2 rounded-lg hover:bg-red-950/20"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Linha 2 de Detalhes: Classe, Origem, NEX, Deslocamento, Patente */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                <div className="bg-[#0b0e14] p-2.5 rounded-lg border border-white/5">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400 block">CLASSE</span>
+                  <select
+                    value={currentChar.class || 'Combatente'}
+                    onChange={(e) => updateCharacterField(prev => ({ ...prev, class: e.target.value }))}
+                    className="w-full bg-transparent text-xs font-bold text-amber-300 outline-none mt-1 cursor-pointer"
+                  >
+                    <option value="Combatente" className="bg-zinc-900">Combatente</option>
+                    <option value="Especialista" className="bg-zinc-900">Especialista</option>
+                    <option value="Ocultista" className="bg-zinc-900">Ocultista</option>
+                  </select>
+                </div>
+
+                <div className="bg-[#0b0e14] p-2.5 rounded-lg border border-white/5">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400 block">ORIGEM</span>
+                  <input
+                    type="text"
+                    value={currentChar.origin || ''}
+                    onChange={(e) => updateCharacterField(prev => ({ ...prev, origin: e.target.value }))}
+                    className="w-full bg-transparent text-xs font-bold text-zinc-200 outline-none mt-1"
+                    placeholder="Ex: Policial"
+                  />
+                </div>
+
+                <div className="bg-[#0b0e14] p-2.5 rounded-lg border border-white/5">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400 block">NEX (%)</span>
+                  <div className="flex items-center gap-1 mt-1">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={currentChar.nex || 5}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, nex: Number(e.target.value) }))}
+                      className="w-12 bg-transparent text-xs font-bold text-amber-400 outline-none"
+                    />
+                    <span className="text-xs text-zinc-400 font-mono">%</span>
+                  </div>
+                </div>
+
+                <div className="bg-[#0b0e14] p-2.5 rounded-lg border border-white/5">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400 block">DESLOCAMENTO</span>
+                  <input
+                    type="text"
+                    value={currentChar.deslocamento || '9m'}
+                    onChange={(e) => updateCharacterField(prev => ({ ...prev, deslocamento: e.target.value }))}
+                    className="w-full bg-transparent text-xs font-bold text-zinc-200 outline-none mt-1"
+                  />
+                </div>
+
+                <div className="bg-[#0b0e14] p-2.5 rounded-lg border border-white/5">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400 block">PATENTE</span>
+                  <input
+                    type="text"
+                    value={currentChar.patente || 'Recruta'}
+                    onChange={(e) => updateCharacterField(prev => ({ ...prev, patente: e.target.value }))}
+                    className="w-full bg-transparent text-xs font-bold text-zinc-200 outline-none mt-1"
+                  />
+                </div>
+
+                <div className="bg-[#0b0e14] p-2.5 rounded-lg border border-white/5">
+                  <span className="text-[10px] uppercase font-mono text-zinc-400 block">PRESTÍGIO</span>
+                  <input
+                    type="number"
+                    value={currentChar.prestigio || 0}
+                    onChange={(e) => updateCharacterField(prev => ({ ...prev, prestigio: Number(e.target.value) }))}
+                    className="w-full bg-transparent text-xs font-bold text-zinc-200 outline-none mt-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO PRINCIPAL: ATRIBUTOS (PENTAGRAMA) + VITAIS (PV, PE, SAN, DEFESA) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* ATRIBUTOS (5 Colunas em lg) */}
+              <div className="lg:col-span-5 bg-[#121620] border border-white/10 rounded-xl p-5 shadow-xl flex flex-col justify-between">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+                  <h3 className="font-mono text-xs font-bold uppercase tracking-widest text-amber-400 flex items-center gap-2">
+                    <Skull className="w-4 h-4 text-amber-500" />
+                    Círculo de Atributos
+                  </h3>
+                  <span className="text-[10px] text-zinc-400 italic">Clique para rolar o teste</span>
+                </div>
+
+                {/* Exibição dos 5 Atributos em Pentagrama / Grid Estilizada */}
+                <div className="grid grid-cols-3 gap-3 my-auto py-2">
+                  {/* FORÇA */}
+                  <div className="flex flex-col items-center p-3 rounded-xl bg-gradient-to-b from-[#181d29] to-[#0f121a] border border-white/5 hover:border-red-500/50 transition group">
+                    <span className="text-[10px] font-mono font-bold text-zinc-400 tracking-wider">FORÇA</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={currentChar.attributes.FOR ?? 1}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        updateCharacterField(prev => ({
+                          ...prev,
+                          attributes: { ...prev.attributes, FOR: val }
+                        }));
+                      }}
+                      className="w-14 text-center bg-transparent text-2xl font-black text-white focus:outline-none my-1"
+                    />
+                    <button
+                      onClick={() => rollAttribute('FORÇA', currentChar.attributes.FOR)}
+                      className="w-full py-1 bg-red-950/40 hover:bg-red-800 text-red-200 rounded text-[10px] font-mono font-bold flex items-center justify-center gap-1 transition"
+                    >
+                      <Dices className="w-3 h-3" /> FOR
+                    </button>
+                  </div>
+
+                  {/* AGILIDADE */}
+                  <div className="flex flex-col items-center p-3 rounded-xl bg-gradient-to-b from-[#181d29] to-[#0f121a] border border-white/5 hover:border-amber-500/50 transition group">
+                    <span className="text-[10px] font-mono font-bold text-zinc-400 tracking-wider">AGILIDADE</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={currentChar.attributes.AGI ?? 1}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        updateCharacterField(prev => ({
+                          ...prev,
+                          attributes: { ...prev.attributes, AGI: val }
+                        }));
+                      }}
+                      className="w-14 text-center bg-transparent text-2xl font-black text-white focus:outline-none my-1"
+                    />
+                    <button
+                      onClick={() => rollAttribute('AGILIDADE', currentChar.attributes.AGI)}
+                      className="w-full py-1 bg-amber-950/40 hover:bg-amber-800 text-amber-200 rounded text-[10px] font-mono font-bold flex items-center justify-center gap-1 transition"
+                    >
+                      <Dices className="w-3 h-3" /> AGI
+                    </button>
+                  </div>
+
+                  {/* INTELECTO */}
+                  <div className="flex flex-col items-center p-3 rounded-xl bg-gradient-to-b from-[#181d29] to-[#0f121a] border border-white/5 hover:border-cyan-500/50 transition group">
+                    <span className="text-[10px] font-mono font-bold text-zinc-400 tracking-wider">INTELECTO</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={currentChar.attributes.INT ?? 1}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        updateCharacterField(prev => ({
+                          ...prev,
+                          attributes: { ...prev.attributes, INT: val }
+                        }));
+                      }}
+                      className="w-14 text-center bg-transparent text-2xl font-black text-white focus:outline-none my-1"
+                    />
+                    <button
+                      onClick={() => rollAttribute('INTELECTO', currentChar.attributes.INT)}
+                      className="w-full py-1 bg-cyan-950/40 hover:bg-cyan-800 text-cyan-200 rounded text-[10px] font-mono font-bold flex items-center justify-center gap-1 transition"
+                    >
+                      <Dices className="w-3 h-3" /> INT
+                    </button>
+                  </div>
+
+                  {/* VIGOR */}
+                  <div className="col-start-1 col-end-2 sm:col-auto flex flex-col items-center p-3 rounded-xl bg-gradient-to-b from-[#181d29] to-[#0f121a] border border-white/5 hover:border-emerald-500/50 transition group">
+                    <span className="text-[10px] font-mono font-bold text-zinc-400 tracking-wider">VIGOR</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={currentChar.attributes.VIG ?? 1}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        updateCharacterField(prev => ({
+                          ...prev,
+                          attributes: { ...prev.attributes, VIG: val }
+                        }));
+                      }}
+                      className="w-14 text-center bg-transparent text-2xl font-black text-white focus:outline-none my-1"
+                    />
+                    <button
+                      onClick={() => rollAttribute('VIGOR', currentChar.attributes.VIG)}
+                      className="w-full py-1 bg-emerald-950/40 hover:bg-emerald-800 text-emerald-200 rounded text-[10px] font-mono font-bold flex items-center justify-center gap-1 transition"
+                    >
+                      <Dices className="w-3 h-3" /> VIG
+                    </button>
+                  </div>
+
+                  {/* PRESENÇA */}
+                  <div className="col-start-3 col-end-4 sm:col-auto flex flex-col items-center p-3 rounded-xl bg-gradient-to-b from-[#181d29] to-[#0f121a] border border-white/5 hover:border-purple-500/50 transition group">
+                    <span className="text-[10px] font-mono font-bold text-zinc-400 tracking-wider">PRESENÇA</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={currentChar.attributes.PRE ?? 1}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        updateCharacterField(prev => ({
+                          ...prev,
+                          attributes: { ...prev.attributes, PRE: val }
+                        }));
+                      }}
+                      className="w-14 text-center bg-transparent text-2xl font-black text-white focus:outline-none my-1"
+                    />
+                    <button
+                      onClick={() => rollAttribute('PRESENÇA', currentChar.attributes.PRE)}
+                      className="w-full py-1 bg-purple-950/40 hover:bg-purple-800 text-purple-200 rounded text-[10px] font-mono font-bold flex items-center justify-center gap-1 transition"
+                    >
+                      <Dices className="w-3 h-3" /> PRE
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-[#0b0e14] p-2.5 rounded-lg border border-white/5 mt-3 text-center">
+                  <p className="text-[11px] text-zinc-400">
+                    Regra oficial: rola a quantidade de <strong>d20</strong> igual ao atributo e mantém o <strong>maior</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {/* STATUS VITAIS & DEFESA (7 Colunas em lg) */}
+              <div className="lg:col-span-7 space-y-4">
+                {/* CARD PV, PE, SAN */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* PONTOS DE VIDA (PV) */}
+                  <div className="bg-[#141822] border-2 border-red-900/60 rounded-xl p-4 shadow-lg flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-red-400 flex items-center gap-1.5">
+                        <Heart className="w-4 h-4 text-red-500 fill-red-500" /> PV
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-mono">PONTOS DE VIDA</span>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2 my-3">
+                      <input
+                        type="number"
+                        value={currentChar.pv?.current ?? 20}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            pv: { ...prev.pv, current: v }
+                          }));
+                        }}
+                        className="w-16 bg-transparent text-center text-3xl font-black text-red-200 outline-none"
+                      />
+                      <span className="text-xl text-zinc-600 font-light">/</span>
+                      <input
+                        type="number"
+                        value={currentChar.pv?.max ?? 20}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            pv: { ...prev.pv, max: v }
+                          }));
+                        }}
+                        className="w-14 bg-transparent text-center text-lg font-bold text-zinc-400 outline-none"
+                      />
+                    </div>
+
+                    {/* Barra de Progresso de PV */}
+                    <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden mb-3">
+                      <div 
+                        className="bg-red-600 h-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(0, ((currentChar.pv?.current || 0) / (currentChar.pv?.max || 1)) * 100))}%` }}
+                      />
+                    </div>
+
+                    {/* Botões Rápidos */}
+                    <div className="flex items-center justify-between gap-1">
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pv: { ...prev.pv, current: (prev.pv.current || 0) - 1 } }))}
+                        className="flex-1 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 rounded text-xs font-bold"
+                      >-1</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pv: { ...prev.pv, current: (prev.pv.current || 0) - 5 } }))}
+                        className="flex-1 py-1 bg-red-950/60 hover:bg-red-900 text-red-300 rounded text-xs font-bold"
+                      >-5</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pv: { ...prev.pv, current: (prev.pv.current || 0) + 1 } }))}
+                        className="flex-1 py-1 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 rounded text-xs font-bold"
+                      >+1</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pv: { ...prev.pv, current: (prev.pv.current || 0) + 5 } }))}
+                        className="flex-1 py-1 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 rounded text-xs font-bold"
+                      >+5</button>
+                    </div>
+                  </div>
+
+                  {/* PONTOS DE ESFORÇO (PE) */}
+                  <div className="bg-[#141822] border-2 border-amber-900/60 rounded-xl p-4 shadow-lg flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-amber-500 fill-amber-500" /> PE
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-mono">ESFORÇO</span>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2 my-3">
+                      <input
+                        type="number"
+                        value={currentChar.pe?.current ?? 4}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            pe: { ...prev.pe, current: v }
+                          }));
+                        }}
+                        className="w-16 bg-transparent text-center text-3xl font-black text-amber-200 outline-none"
+                      />
+                      <span className="text-xl text-zinc-600 font-light">/</span>
+                      <input
+                        type="number"
+                        value={currentChar.pe?.max ?? 4}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            pe: { ...prev.pe, max: v }
+                          }));
+                        }}
+                        className="w-14 bg-transparent text-center text-lg font-bold text-zinc-400 outline-none"
+                      />
+                    </div>
+
+                    {/* Barra de Progresso de PE */}
+                    <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden mb-3">
+                      <div 
+                        className="bg-amber-500 h-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(0, ((currentChar.pe?.current || 0) / (currentChar.pe?.max || 1)) * 100))}%` }}
+                      />
+                    </div>
+
+                    {/* Botões Rápidos */}
+                    <div className="flex items-center justify-between gap-1">
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pe: { ...prev.pe, current: Math.max(0, (prev.pe.current || 0) - 1) } }))}
+                        className="flex-1 py-1 bg-amber-950/60 hover:bg-amber-900 text-amber-300 rounded text-xs font-bold"
+                      >-1</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pe: { ...prev.pe, current: Math.max(0, (prev.pe.current || 0) - 2) } }))}
+                        className="flex-1 py-1 bg-amber-950/60 hover:bg-amber-900 text-amber-300 rounded text-xs font-bold"
+                      >-2</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pe: { ...prev.pe, current: (prev.pe.current || 0) + 1 } }))}
+                        className="flex-1 py-1 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 rounded text-xs font-bold"
+                      >+1</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, pe: { ...prev.pe, current: (prev.pe.current || 0) + 2 } }))}
+                        className="flex-1 py-1 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 rounded text-xs font-bold"
+                      >+2</button>
+                    </div>
+                  </div>
+
+                  {/* SANIDADE (SAN) */}
+                  <div className="bg-[#141822] border-2 border-cyan-900/60 rounded-xl p-4 shadow-lg flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                        <Brain className="w-4 h-4 text-cyan-500" /> SAN
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-mono">SANIDADE</span>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-2 my-3">
+                      <input
+                        type="number"
+                        value={currentChar.san?.current ?? 12}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            san: { ...prev.san, current: v }
+                          }));
+                        }}
+                        className="w-16 bg-transparent text-center text-3xl font-black text-cyan-200 outline-none"
+                      />
+                      <span className="text-xl text-zinc-600 font-light">/</span>
+                      <input
+                        type="number"
+                        value={currentChar.san?.max ?? 12}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            san: { ...prev.san, max: v }
+                          }));
+                        }}
+                        className="w-14 bg-transparent text-center text-lg font-bold text-zinc-400 outline-none"
+                      />
+                    </div>
+
+                    {/* Barra de Progresso de SAN */}
+                    <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden mb-3">
+                      <div 
+                        className="bg-cyan-600 h-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, Math.max(0, ((currentChar.san?.current || 0) / (currentChar.san?.max || 1)) * 100))}%` }}
+                      />
+                    </div>
+
+                    {/* Botões Rápidos */}
+                    <div className="flex items-center justify-between gap-1">
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, san: { ...prev.san, current: Math.max(0, (prev.san.current || 0) - 1) } }))}
+                        className="flex-1 py-1 bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 rounded text-xs font-bold"
+                      >-1</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, san: { ...prev.san, current: Math.max(0, (prev.san.current || 0) - 5) } }))}
+                        className="flex-1 py-1 bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 rounded text-xs font-bold"
+                      >-5</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, san: { ...prev.san, current: (prev.san.current || 0) + 1 } }))}
+                        className="flex-1 py-1 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 rounded text-xs font-bold"
+                      >+1</button>
+                      <button 
+                        onClick={() => updateCharacterField(prev => ({ ...prev, san: { ...prev.san, current: (prev.san.current || 0) + 5 } }))}
+                        className="flex-1 py-1 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 rounded text-xs font-bold"
+                      >+5</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* DEFESA, RESISTÊNCIAS E PROTEÇÃO */}
+                <div className="bg-[#121620] border border-white/10 rounded-xl p-4 shadow-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    {/* Defesa Total Calculada */}
+                    <div className="flex items-center gap-3 bg-[#0a0c0f] p-3 rounded-lg border border-amber-600/30">
+                      <div className="w-12 h-12 rounded-lg bg-amber-600/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                        <Shield className="w-6 h-6 text-amber-400" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-mono text-zinc-400 block">DEFESA TOTAL</span>
+                        <span className="text-2xl font-black text-white">
+                          {10 + (Number(currentChar.attributes.AGI) || 0) + (Number(currentChar.defense?.armorBonus) || 0) + (Number(currentChar.defense?.otherBonus) || 0)}
+                        </span>
+                        <span className="text-[10px] text-zinc-400 block font-mono">10 + AGI + Bônus</span>
+                      </div>
+                    </div>
+
+                    {/* Bônus de Equipamento */}
+                    <div className="bg-[#0b0e14] p-3 rounded-lg border border-white/5">
+                      <span className="text-[10px] uppercase font-mono text-zinc-400 block">BÔNUS EQUIPAMENTO</span>
+                      <input
+                        type="number"
+                        value={currentChar.defense?.armorBonus ?? 0}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            defense: { ...prev.defense, armorBonus: v }
+                          }));
+                        }}
+                        className="w-full bg-transparent text-base font-bold text-amber-300 outline-none mt-1"
+                      />
+                    </div>
+
+                    {/* Outros Bônus */}
+                    <div className="bg-[#0b0e14] p-3 rounded-lg border border-white/5">
+                      <span className="text-[10px] uppercase font-mono text-zinc-400 block">OUTROS BÔNUS</span>
+                      <input
+                        type="number"
+                        value={currentChar.defense?.otherBonus ?? 0}
+                        onChange={(e) => {
+                          const v = Number(e.target.value);
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            defense: { ...prev.defense, otherBonus: v }
+                          }));
+                        }}
+                        className="w-full bg-transparent text-base font-bold text-amber-300 outline-none mt-1"
+                      />
+                    </div>
+
+                    {/* Resistências */}
+                    <div className="bg-[#0b0e14] p-3 rounded-lg border border-white/5">
+                      <span className="text-[10px] uppercase font-mono text-zinc-400 block">RESISTÊNCIAS A DANO</span>
+                      <input
+                        type="text"
+                        value={currentChar.defense?.resistances || ''}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            defense: { ...prev.defense, resistances: v }
+                          }));
+                        }}
+                        placeholder="Ex: Corte 5, Morte 10"
+                        className="w-full bg-transparent text-xs font-semibold text-zinc-200 outline-none mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* BARRA DE NAVEGAÇÃO DE ABAS */}
+            <div className="flex items-center gap-1 border-b border-white/10 overflow-x-auto pb-1 scrollbar-thin">
+              {[
+                { id: 'pericias', label: 'Perícias (28)', icon: Sparkles },
+                { id: 'combate', label: 'Ataques & Armas', icon: Swords },
+                { id: 'rituais', label: 'Habilidades & Rituais', icon: Zap },
+                { id: 'inventario', label: 'Inventário & Carga', icon: Package },
+                { id: 'bio', label: 'Histórico & Roleplay', icon: User },
+              ].map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-xs font-bold transition tracking-wider uppercase font-mono border-b-2 ${
+                      isActive 
+                        ? 'bg-[#151924] border-amber-500 text-amber-300 shadow-inner' 
+                        : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-[#121620]'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-zinc-400'}`} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* ABA: PERÍCIAS */}
+            {activeTab === 'pericias' && (
+              <div className="bg-[#121620] border border-white/10 rounded-xl p-5 shadow-xl">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/10">
+                  <div>
+                    <h4 className="font-mono text-sm font-bold text-white uppercase tracking-wider">Perícias Oficiais</h4>
+                    <p className="text-xs text-zinc-400">Total calculado automaticamente (Bônus de Treinamento + Outros)</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 bg-[#0a0c0f] px-3 py-1.5 rounded-lg border border-white/5">
+                    <span>Legenda:</span>
+                    <span className="text-zinc-400">D (+0)</span>
+                    <span className="text-amber-400 font-bold">T (+5)</span>
+                    <span className="text-cyan-400 font-bold">V (+10)</span>
+                    <span className="text-purple-400 font-bold">E (+15)</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {SKILLS_LIST.map((skill) => {
+                    const skillData = currentChar.skills[skill.name] || { training: 0, bonus: 0 };
+                    const attrKey = skill.attr;
+                    const attrVal = currentChar.attributes[attrKey] || 0;
+                    const totalBonus = (Number(skillData.training) || 0) + (Number(skillData.bonus) || 0);
+
+                    return (
+                      <div 
+                        key={skill.name}
+                        className="bg-[#0e121a] hover:bg-[#151924] border border-white/5 hover:border-amber-600/30 p-2.5 rounded-lg flex items-center justify-between gap-2 transition"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <button
+                            onClick={() => rollSkill(skill)}
+                            title={`Rolar teste de ${skill.name}`}
+                            className="w-7 h-7 rounded bg-[#181d29] hover:bg-amber-600 hover:text-black text-amber-400 border border-white/10 flex items-center justify-center shrink-0 transition"
+                          >
+                            <Dices className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="truncate">
+                            <span className="font-bold text-xs text-zinc-200 block truncate">{skill.name}</span>
+                            <span className="text-[10px] text-zinc-400 font-mono">
+                              {attrKey} ({attrVal}d20) {skill.onlyTrained ? '• Só Treinada' : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Seletor de Treino e Bônus Adicional */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <select
+                            value={skillData.training ?? 0}
+                            onChange={(e) => {
+                              const t = Number(e.target.value);
+                              updateCharacterField(prev => ({
+                                ...prev,
+                                skills: {
+                                  ...prev.skills,
+                                  [skill.name]: { ...skillData, training: t }
+                                }
+                              }));
+                            }}
+                            className="bg-[#181d29] text-[11px] font-mono font-bold text-amber-300 rounded px-1.5 py-1 border border-white/10 outline-none cursor-pointer"
+                          >
+                            <option value={0}>+0</option>
+                            <option value={5}>+5 (T)</option>
+                            <option value={10}>+10 (V)</option>
+                            <option value={15}>+15 (E)</option>
+                          </select>
+
+                          <input
+                            type="number"
+                            title="Outros bônus (itens, rituais, etc)"
+                            value={skillData.bonus ?? 0}
+                            onChange={(e) => {
+                              const b = Number(e.target.value);
+                              updateCharacterField(prev => ({
+                                ...prev,
+                                skills: {
+                                  ...prev.skills,
+                                  [skill.name]: { ...skillData, bonus: b }
+                                }
+                              }));
+                            }}
+                            className="w-10 bg-[#181d29] text-center text-xs font-mono text-zinc-300 rounded py-1 border border-white/10 outline-none"
+                            placeholder="+0"
+                          />
+
+                          <div className="w-8 text-right font-mono font-black text-xs text-amber-400">
+                            {totalBonus >= 0 ? `+${totalBonus}` : totalBonus}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ABA: COMBATE & ARMAS */}
+            {activeTab === 'combate' && (
+              <div className="bg-[#121620] border border-white/10 rounded-xl p-5 shadow-xl space-y-4">
+                <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                  <div>
+                    <h4 className="font-mono text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <Swords className="w-4 h-4 text-amber-500" />
+                      Tabela de Ataques & Armas
+                    </h4>
+                    <p className="text-xs text-zinc-400">Gerencie suas armas, rolagem de teste de ataque e dados de dano</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newAtt = {
+                        id: 'att_' + Date.now(),
+                        name: 'Nova Arma',
+                        test: 'Luta',
+                        damage: '1d8',
+                        crit: '20/x2',
+                        range: 'Curto',
+                        special: 'Impacto'
+                      };
+                      updateCharacterField(prev => ({
+                        ...prev,
+                        attacks: [...(prev.attacks || []), newAtt]
+                      }));
+                    }}
+                    className="flex items-center gap-1.5 bg-amber-600/30 hover:bg-amber-600 hover:text-black text-amber-300 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-amber-500/40"
+                  >
+                    <Plus className="w-4 h-4" /> Adicionar Arma
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-[#0b0e14] text-zinc-400 uppercase text-[10px] tracking-wider border-b border-white/10">
+                      <tr>
+                        <th className="p-3">Arma / Ataque</th>
+                        <th className="p-3">Perícia de Teste</th>
+                        <th className="p-3">Dano</th>
+                        <th className="p-3">Crítico</th>
+                        <th className="p-3">Alcance</th>
+                        <th className="p-3">Especial / Tipo</th>
+                        <th className="p-3 text-right">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {(currentChar.attacks || []).map((att) => (
+                        <tr key={att.id} className="hover:bg-white/[0.02] transition">
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={att.name || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  attacks: prev.attacks.map(a => a.id === att.id ? { ...a, name: val } : a)
+                                }));
+                              }}
+                              className="bg-transparent font-bold text-white outline-none w-full border-b border-transparent focus:border-amber-500"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={att.test || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  attacks: prev.attacks.map(a => a.id === att.id ? { ...a, test: val } : a)
+                                }));
+                              }}
+                              placeholder="Ex: Pontaria"
+                              className="bg-transparent text-amber-300 outline-none w-24 border-b border-transparent focus:border-amber-500"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={att.damage || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  attacks: prev.attacks.map(a => a.id === att.id ? { ...a, damage: val } : a)
+                                }));
+                              }}
+                              placeholder="Ex: 2d6+2"
+                              className="bg-transparent font-bold text-red-400 outline-none w-20 border-b border-transparent focus:border-amber-500"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={att.crit || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  attacks: prev.attacks.map(a => a.id === att.id ? { ...a, crit: val } : a)
+                                }));
+                              }}
+                              className="bg-transparent text-zinc-300 outline-none w-16"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={att.range || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  attacks: prev.attacks.map(a => a.id === att.id ? { ...a, range: val } : a)
+                                }));
+                              }}
+                              className="bg-transparent text-zinc-300 outline-none w-20"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={att.special || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  attacks: prev.attacks.map(a => a.id === att.id ? { ...a, special: val } : a)
+                                }));
+                              }}
+                              className="bg-transparent text-zinc-400 outline-none w-24"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                onClick={() => {
+                                  // Rolar Teste de Ataque
+                                  const skill = SKILLS_LIST.find(s => s.name.toLowerCase() === (att.test || '').toLowerCase());
+                                  if (skill) {
+                                    rollSkill(skill);
+                                  } else {
+                                    rollDamageOrCustom(`Ataque com ${att.name}`, '1d20');
+                                  }
+                                }}
+                                className="px-2 py-1 bg-amber-950/60 hover:bg-amber-800 text-amber-200 rounded font-bold transition flex items-center gap-1"
+                                title="Rolar Teste de Acerto"
+                              >
+                                <Dices className="w-3 h-3" /> Acerto
+                              </button>
+                              <button
+                                onClick={() => rollDamageOrCustom(`${att.name} (${att.damage})`, att.damage)}
+                                className="px-2 py-1 bg-red-950/60 hover:bg-red-800 text-red-200 rounded font-bold transition flex items-center gap-1"
+                                title="Rolar Dano da Arma"
+                              >
+                                <Skull className="w-3 h-3" /> Dano
+                              </button>
+                              <button
+                                onClick={() => {
+                                  updateCharacterField(prev => ({
+                                    ...prev,
+                                    attacks: prev.attacks.filter(a => a.id !== att.id)
+                                  }));
+                                }}
+                                className="p-1 hover:text-red-400 text-zinc-600 transition"
+                                title="Remover Arma"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ABA: HABILIDADES & RITUAIS */}
+            {activeTab === 'rituais' && (
+              <div className="bg-[#121620] border border-white/10 rounded-xl p-5 shadow-xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+                  <div>
+                    <h4 className="font-mono text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-500" />
+                      Habilidades, Poderes & Rituais
+                    </h4>
+                    <p className="text-xs text-zinc-400">Registre habilidades de classe, poderes paranormais e rituais aprendidos</p>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2 bg-[#0a0c0f] px-3 py-1 rounded-lg border border-white/10">
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase">DT DE RITUAIS:</span>
+                      <input
+                        type="number"
+                        value={currentChar.dtRituals ?? 13}
+                        onChange={(e) => updateCharacterField(prev => ({ ...prev, dtRituals: Number(e.target.value) }))}
+                        className="w-10 bg-transparent text-sm font-bold text-amber-400 outline-none text-center"
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const newRit = {
+                          id: 'rit_' + Date.now(),
+                          name: 'Novo Ritual / Poder',
+                          cost: '1 PE',
+                          circle: '1º Círculo',
+                          page: 'p. 110',
+                          dt: '',
+                          desc: 'Descrição detalhada dos efeitos, alcance e duração.'
+                        };
+                        updateCharacterField(prev => ({
+                          ...prev,
+                          rituals: [...(prev.rituals || []), newRit]
+                        }));
+                      }}
+                      className="flex items-center gap-1 bg-amber-600/30 hover:bg-amber-600 hover:text-black text-amber-300 px-3 py-1.5 rounded-lg text-xs font-bold transition border border-amber-500/40"
+                    >
+                      <Plus className="w-4 h-4" /> Adicionar
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {(currentChar.rituals || []).map((rit) => (
+                    <div 
+                      key={rit.id}
+                      className="bg-[#0e121a] border border-white/5 hover:border-amber-600/40 p-4 rounded-xl space-y-2 transition shadow-md"
+                    >
+                      <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
+                        <input
+                          type="text"
+                          value={rit.name || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateCharacterField(prev => ({
+                              ...prev,
+                              rituals: prev.rituals.map(r => r.id === rit.id ? { ...r, name: val } : r)
+                            }));
+                          }}
+                          className="bg-transparent font-bold text-sm text-amber-300 outline-none flex-1 border-b border-transparent focus:border-amber-500 font-serif"
+                          placeholder="Nome do Ritual ou Habilidade..."
+                        />
+                        <button
+                          onClick={() => {
+                            updateCharacterField(prev => ({
+                              ...prev,
+                              rituals: prev.rituals.filter(r => r.id !== rit.id)
+                            }));
+                          }}
+                          className="text-zinc-600 hover:text-red-400 transition"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs font-mono">
+                        <input
+                          type="text"
+                          value={rit.cost || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateCharacterField(prev => ({
+                              ...prev,
+                              rituals: prev.rituals.map(r => r.id === rit.id ? { ...r, cost: val } : r)
+                            }));
+                          }}
+                          placeholder="Custo: 1 PE"
+                          className="bg-[#161a24] px-2 py-0.5 rounded text-amber-400 w-24 outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={rit.circle || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateCharacterField(prev => ({
+                              ...prev,
+                              rituals: prev.rituals.map(r => r.id === rit.id ? { ...r, circle: val } : r)
+                            }));
+                          }}
+                          placeholder="Círculo / Tipo"
+                          className="bg-[#161a24] px-2 py-0.5 rounded text-zinc-300 flex-1 outline-none"
+                        />
+                        <input
+                          type="text"
+                          value={rit.page || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateCharacterField(prev => ({
+                              ...prev,
+                              rituals: prev.rituals.map(r => r.id === rit.id ? { ...r, page: val } : r)
+                            }));
+                          }}
+                          placeholder="Pág."
+                          className="bg-[#161a24] px-2 py-0.5 rounded text-zinc-400 w-16 outline-none text-right"
+                        />
+                      </div>
+
+                      <textarea
+                        rows={3}
+                        value={rit.desc || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          updateCharacterField(prev => ({
+                            ...prev,
+                            rituals: prev.rituals.map(r => r.id === rit.id ? { ...r, desc: val } : r)
+                          }));
+                        }}
+                        className="w-full bg-transparent text-xs text-zinc-300 outline-none resize-none placeholder-zinc-600"
+                        placeholder="Descreva o efeito completo, alcance, duração e regras..."
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ABA: INVENTÁRIO & CARGA */}
+            {activeTab === 'inventario' && (
+              <div className="bg-[#121620] border border-white/10 rounded-xl p-5 shadow-xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <h4 className="font-mono text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <Package className="w-4 h-4 text-amber-500" />
+                      Inventário, Limite de Carga & Prestígio
+                    </h4>
+                    <p className="text-xs text-zinc-400">Controle rigoroso de peso e categoria de itens da Ordem</p>
+                  </div>
+
+                  {/* Resumo da Carga */}
+                  <div className="flex items-center gap-3">
+                    <div className="bg-[#0a0c0f] px-4 py-2 rounded-lg border border-white/10 flex items-center gap-3">
+                      <div>
+                        <span className="text-[10px] font-mono text-zinc-400 uppercase block">CARGA TOTAL</span>
+                        <div className="flex items-center gap-1 font-mono">
+                          <span className={`text-base font-black ${currentLoad > maxCapacity ? 'text-red-400' : 'text-amber-400'}`}>
+                            {currentLoad}
+                          </span>
+                          <span className="text-zinc-600">/</span>
+                          <span className="text-sm font-bold text-zinc-400">{maxCapacity}</span>
+                          <span className="text-[10px] text-zinc-400">espaços</span>
+                        </div>
+                      </div>
+                      <div className="w-16 bg-zinc-800 h-2 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${currentLoad > maxCapacity ? 'bg-red-500' : 'bg-amber-500'}`}
+                          style={{ width: `${Math.min(100, (currentLoad / (maxCapacity || 1)) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const newItem = {
+                          id: 'inv_' + Date.now(),
+                          name: 'Novo Item',
+                          category: 'I',
+                          spaces: 1,
+                          desc: 'Descrição ou munição'
+                        };
+                        updateCharacterField(prev => ({
+                          ...prev,
+                          inventory: [...(prev.inventory || []), newItem]
+                        }));
+                      }}
+                      className="flex items-center gap-1 bg-amber-600/30 hover:bg-amber-600 hover:text-black text-amber-300 px-3 py-2 rounded-lg text-xs font-bold transition border border-amber-500/40"
+                    >
+                      <Plus className="w-4 h-4" /> Adicionar Item
+                    </button>
+                  </div>
+                </div>
+
+                {/* Limites de Categoria de Itens */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-[#0a0c0f] p-3 rounded-lg border border-white/5 font-mono text-xs">
+                  <div>
+                    <span className="text-[10px] text-zinc-400 uppercase block">CRÉDITO</span>
+                    <input 
+                      type="text" 
+                      value={currentChar.creditLimit || 'Baixo'}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, creditLimit: e.target.value }))}
+                      className="bg-transparent font-bold text-amber-300 outline-none w-full"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-400 uppercase block">LIMITE I</span>
+                    <input 
+                      type="number" 
+                      value={currentChar.itemLimits?.cat1 ?? 2}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, itemLimits: { ...prev.itemLimits, cat1: Number(e.target.value) } }))}
+                      className="bg-transparent font-bold text-zinc-200 outline-none w-12"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-400 uppercase block">LIMITE II</span>
+                    <input 
+                      type="number" 
+                      value={currentChar.itemLimits?.cat2 ?? 1}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, itemLimits: { ...prev.itemLimits, cat2: Number(e.target.value) } }))}
+                      className="bg-transparent font-bold text-zinc-200 outline-none w-12"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-400 uppercase block">LIMITE III</span>
+                    <input 
+                      type="number" 
+                      value={currentChar.itemLimits?.cat3 ?? 0}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, itemLimits: { ...prev.itemLimits, cat3: Number(e.target.value) } }))}
+                      className="bg-transparent font-bold text-zinc-200 outline-none w-12"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-400 uppercase block">LIMITE IV</span>
+                    <input 
+                      type="number" 
+                      value={currentChar.itemLimits?.cat4 ?? 0}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, itemLimits: { ...prev.itemLimits, cat4: Number(e.target.value) } }))}
+                      className="bg-transparent font-bold text-zinc-200 outline-none w-12"
+                    />
+                  </div>
+                </div>
+
+                {/* Tabela de Itens */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-[#0b0e14] text-zinc-400 uppercase text-[10px] tracking-wider border-b border-white/10">
+                      <tr>
+                        <th className="p-3">Item</th>
+                        <th className="p-3 w-28">Categoria</th>
+                        <th className="p-3 w-24">Espaços</th>
+                        <th className="p-3">Detalhes / Munição</th>
+                        <th className="p-3 w-12 text-right"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {(currentChar.inventory || []).map((it) => (
+                        <tr key={it.id} className="hover:bg-white/[0.02] transition">
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={it.name || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  inventory: prev.inventory.map(i => i.id === it.id ? { ...i, name: val } : i)
+                                }));
+                              }}
+                              className="bg-transparent font-bold text-white outline-none w-full border-b border-transparent focus:border-amber-500"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <select
+                              value={it.category || 'I'}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  inventory: prev.inventory.map(i => i.id === it.id ? { ...i, category: val } : i)
+                                }));
+                              }}
+                              className="bg-[#181d29] text-amber-300 font-bold px-2 py-1 rounded outline-none border border-white/10"
+                            >
+                              <option value="0">0</option>
+                              <option value="I">I</option>
+                              <option value="II">II</option>
+                              <option value="III">III</option>
+                              <option value="IV">IV</option>
+                            </select>
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="number"
+                              min="0"
+                              value={it.spaces ?? 1}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  inventory: prev.inventory.map(i => i.id === it.id ? { ...i, spaces: val } : i)
+                                }));
+                              }}
+                              className="w-16 bg-[#181d29] text-center font-bold text-zinc-200 px-2 py-1 rounded outline-none border border-white/10"
+                            />
+                          </td>
+                          <td className="p-3">
+                            <input
+                              type="text"
+                              value={it.desc || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  inventory: prev.inventory.map(i => i.id === it.id ? { ...i, desc: val } : i)
+                                }));
+                              }}
+                              placeholder="Observações..."
+                              className="bg-transparent text-zinc-400 outline-none w-full"
+                            />
+                          </td>
+                          <td className="p-3 text-right">
+                            <button
+                              onClick={() => {
+                                updateCharacterField(prev => ({
+                                  ...prev,
+                                  inventory: prev.inventory.filter(i => i.id !== it.id)
+                                }));
+                              }}
+                              className="text-zinc-600 hover:text-red-400 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ABA: HISTÓRICO & ROLEPLAY */}
+            {activeTab === 'bio' && (
+              <div className="bg-[#121620] border border-white/10 rounded-xl p-5 shadow-xl space-y-6">
+                <div>
+                  <h4 className="font-mono text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <User className="w-4 h-4 text-amber-500" />
+                    Dossiê do Agente & Roleplay
+                  </h4>
+                  <p className="text-xs text-zinc-400">Informações confidenciais sobre a história e motivações do personagem</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono uppercase text-amber-400 font-bold block">APARÊNCIA FÍSICA</label>
+                    <textarea
+                      rows={4}
+                      value={currentChar.appearance || ''}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, appearance: e.target.value }))}
+                      className="w-full bg-[#0e121a] border border-white/10 rounded-lg p-3 text-xs text-zinc-300 outline-none focus:border-amber-500 resize-none"
+                      placeholder="Altura, roupas, marcas, cicatrizes de encontros paranormais..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono uppercase text-amber-400 font-bold block">PERSONALIDADE & CONDUTA</label>
+                    <textarea
+                      rows={4}
+                      value={currentChar.personality || ''}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, personality: e.target.value }))}
+                      className="w-full bg-[#0e121a] border border-white/10 rounded-lg p-3 text-xs text-zinc-300 outline-none focus:border-amber-500 resize-none"
+                      placeholder="Traços marcantes, medos, virtudes, como lida com o pânico..."
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono uppercase text-amber-400 font-bold block">HISTÓRICO PESSOAL / ORIGEM</label>
+                    <textarea
+                      rows={5}
+                      value={currentChar.history || ''}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, history: e.target.value }))}
+                      className="w-full bg-[#0e121a] border border-white/10 rounded-lg p-3 text-xs text-zinc-300 outline-none focus:border-amber-500 resize-none"
+                      placeholder="Como conheceu o paranormal? O que perdeu? Como a Ordem o recrutou?"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-mono uppercase text-amber-400 font-bold block">OBJETIVO PRINCIPAL</label>
+                    <textarea
+                      rows={5}
+                      value={currentChar.objective || ''}
+                      onChange={(e) => updateCharacterField(prev => ({ ...prev, objective: e.target.value }))}
+                      className="w-full bg-[#0e121a] border border-white/10 rounded-lg p-3 text-xs text-zinc-300 outline-none focus:border-amber-500 resize-none"
+                      placeholder="O que o mantém são e lutando? Qual mistério busca desvendar?"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* PAINEL LATERAL: HISTÓRICO DE DADOS & ROLADOR LIVRE (SINCRONIZADO) */}
+      <aside 
+        className={`fixed top-0 right-0 h-full w-80 sm:w-96 bg-[#0f131c] border-l border-white/10 shadow-2xl z-50 transform transition-transform duration-300 flex flex-col ${
+          isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
+        {/* Topo do Painel */}
+        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[#141824]">
+          <div className="flex items-center gap-2">
+            <Dices className="w-5 h-5 text-amber-400 animate-spin-slow" />
+            <span className="font-mono font-bold text-sm text-white uppercase tracking-wider">Log da Mesa</span>
+          </div>
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="text-zinc-400 hover:text-white p-1 rounded transition"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Rolador Rápido Livre */}
+        <div className="p-3 bg-[#0a0c10] border-b border-white/10 space-y-2">
+          <span className="text-[10px] font-mono uppercase text-zinc-400 font-bold block">ROLADOR RÁPIDO</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[4, 6, 8, 10, 12, 20, 100].map(sides => (
+              <button
+                key={sides}
+                onClick={() => {
+                  const r = Math.floor(Math.random() * sides) + 1;
+                  sendDiceRoll({
+                    title: `Dado d${sides}`,
+                    result: r,
+                    detail: `Resultado: ${r}`,
+                    type: 'free'
+                  });
+                }}
+                className="px-2.5 py-1 bg-[#181d29] hover:bg-amber-600 hover:text-black border border-white/10 rounded font-mono text-xs font-bold text-zinc-300 transition"
+              >
+                d{sides}
+              </button>
+            ))}
+          </div>
+
+          {/* Rolagem Customizada com Bônus */}
+          <div className="flex items-center gap-1 pt-1 font-mono text-xs">
+            <input 
+              type="number"
+              min="1"
+              max="10"
+              value={customDiceQty}
+              onChange={(e) => setCustomDiceQty(Math.max(1, Number(e.target.value)))}
+              className="w-10 bg-[#161a24] text-center rounded py-1 border border-white/10 outline-none text-amber-300 font-bold"
+            />
+            <span className="text-zinc-500">d</span>
+            <input 
+              type="number"
+              min="2"
+              max="100"
+              value={customDiceSides}
+              onChange={(e) => setCustomDiceSides(Math.max(2, Number(e.target.value)))}
+              className="w-12 bg-[#161a24] text-center rounded py-1 border border-white/10 outline-none text-amber-300 font-bold"
+            />
+            <span className="text-zinc-500">+</span>
+            <input 
+              type="number"
+              value={customDiceBonus}
+              onChange={(e) => setCustomDiceBonus(Number(e.target.value))}
+              className="w-12 bg-[#161a24] text-center rounded py-1 border border-white/10 outline-none text-zinc-300"
+            />
+            <button
+              onClick={() => {
+                const rolls = [];
+                let sum = 0;
+                for (let i = 0; i < customDiceQty; i++) {
+                  const r = Math.floor(Math.random() * customDiceSides) + 1;
+                  rolls.push(r);
+                  sum += r;
+                }
+                const total = sum + customDiceBonus;
+                sendDiceRoll({
+                  title: `${customDiceQty}d${customDiceSides} + ${customDiceBonus}`,
+                  result: total,
+                  detail: `Dados [${rolls.join(', ')}] + Bônus (${customDiceBonus})`,
+                  type: 'custom'
+                });
+              }}
+              className="flex-1 py-1 bg-amber-600 hover:bg-amber-500 text-black font-bold rounded transition text-center"
+            >
+              Rolar
+            </button>
+          </div>
+        </div>
+
+        {/* Lista de Rolagens em Tempo Real */}
+        <div className="flex-1 p-3 overflow-y-auto space-y-2.5 scrollbar-thin">
+          {diceHistory.length === 0 ? (
+            <div className="text-center py-12 text-zinc-600 text-xs font-mono">
+              Nenhuma rolagem registrada ainda nesta sala.
+            </div>
+          ) : (
+            diceHistory.map((item) => (
+              <div 
+                key={item.id} 
+                className={`p-3 rounded-lg border text-xs font-mono transition shadow ${
+                  item.isCrit 
+                    ? 'bg-amber-950/40 border-amber-500/80 shadow-[0_0_10px_rgba(217,119,6,0.3)]' 
+                    : 'bg-[#141822] border-white/5'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[10px] text-zinc-400 mb-1">
+                  <span className="font-bold text-amber-400">{item.sender}</span>
+                  <span>{new Date(item.timestamp || Date.now()).toLocaleTimeString()}</span>
+                </div>
+                <div className="font-bold text-zinc-200">{item.title}</div>
+                <div className="text-[11px] text-zinc-400 my-1">{item.detail}</div>
+                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-white/5">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest">RESULTADO</span>
+                  <span className={`text-base font-black ${item.isCrit ? 'text-amber-300' : 'text-white'}`}>
+                    {item.result} {item.isCrit && '★ CRÍTICO!'}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+          <div ref={historyEndRef} />
+        </div>
+      </aside>
+
+      {/* MODAL: CRIAR NOVO PERSONAGEM */}
+      {isNewCharModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#121620] border-2 border-amber-600/60 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="font-mono font-bold text-base text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                <Plus className="w-5 h-5 text-amber-500" />
+                Registrar Novo Agente
+              </h3>
+              <button 
+                onClick={() => setIsNewCharModalOpen(false)}
+                className="text-zinc-500 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 font-mono text-xs">
+              <div>
+                <label className="text-zinc-400 uppercase text-[10px] block mb-1">NOME DO PERSONAGEM *</label>
+                <input
+                  type="text"
+                  value={newCharName}
+                  onChange={(e) => setNewCharName(e.target.value)}
+                  placeholder="Ex: Arthur Cervero"
+                  className="w-full bg-[#0a0c10] border border-white/10 rounded-lg p-2.5 text-sm text-white font-sans outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-zinc-400 uppercase text-[10px] block mb-1">JOGADOR RESPONSÁVEL</label>
+                <input
+                  type="text"
+                  value={newCharPlayer}
+                  onChange={(e) => setNewCharPlayer(e.target.value)}
+                  placeholder="Ex: Seu Nome ou Apelido"
+                  className="w-full bg-[#0a0c10] border border-white/10 rounded-lg p-2.5 text-sm text-white font-sans outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-zinc-400 uppercase text-[10px] block mb-1">CLASSE INICIAL</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['Combatente', 'Especialista', 'Ocultista'].map((cls) => (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => setNewCharClass(cls)}
+                      className={`p-2 rounded-lg border text-xs font-bold transition text-center ${
+                        newCharClass === cls 
+                          ? 'bg-amber-600 text-black border-amber-500 shadow-lg' 
+                          : 'bg-[#0a0c10] text-zinc-400 border-white/5 hover:border-zinc-700'
+                      }`}
+                    >
+                      {cls}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/10">
+              <button
+                onClick={() => setIsNewCharModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-zinc-400 hover:text-white transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateNewCharacter}
+                className="px-5 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-black text-xs font-black rounded-lg shadow-lg transition"
+              >
+                Criar Ficha
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
