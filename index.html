@@ -185,6 +185,36 @@
       db.ref(`mesas/${salaAtual}/${charId}/${campo}`).set(novo);
     }
 
+    // Funções de Cálculo Automático de Limites por NEX e Atributos
+    function calcularMaximos(p) {
+      const nexNum = parseInt((p.nex || "5%").replace("%", "")) || 5;
+      const niveisExposicao = Math.floor(nexNum / 5); // Ex: 5% = 1, 10% = 2, 50% = 10
+      const vigor = (p.atributos && p.atributos['VIG']) !== undefined ? p.atributos['VIG'] : 1;
+      const presenca = (p.atributos && p.atributos['PRE']) !== undefined ? p.atributos['PRE'] : 1;
+      const classe = (p.classe || "Combatente").toLowerCase();
+
+      let pvBase = 20, pvPorNivel = 4;
+      let peBase = 2, pePorNivel = 2;
+      let sanBase = 12, sanPorNivel = 3;
+
+      if (classe.includes("especialista")) {
+        pvBase = 16; pvPorNivel = 3;
+        peBase = 3; pePorNivel = 3;
+        sanBase = 16; sanPorNivel = 4;
+      } else if (classe.includes("ocultista")) {
+        pvBase = 12; pvPorNivel = 2;
+        peBase = 4; pePorNivel = 4;
+        sanBase = 20; sanPorNivel = 5;
+      }
+
+      // Fórmula oficial: Base + (Níveis acima de 5% * incremento) + (Níveis de exposição * Atributo correspondente)
+      const pvMax = pvBase + vigor + ((niveisExposicao - 1) * (pvPorNivel + vigor));
+      const peMax = peBase + presenca + ((niveisExposicao - 1) * (pePorNivel + presenca));
+      const sanMax = sanBase + ((niveisExposicao - 1) * sanPorNivel);
+
+      return { pvMax: Math.max(pvBase, pvMax), peMax: Math.max(peBase, peMax), sanMax: Math.max(sanBase, sanMax) };
+    }
+
     // Criaturas
     function criarCriatura() {
       const novaRef = db.ref(`criaturas/${salaAtual}`).push();
@@ -283,6 +313,11 @@
       const chavesCriaturas = Object.keys(dadosCriaturas);
       const chavesDocumentos = Object.keys(dadosDocumentos);
 
+      const maximosCalculados = calcularMaximos(p);
+      const pvMaxFinal = p.pvMax !== undefined ? p.pvMax : maximosCalculados.pvMax;
+      const sanMaxFinal = p.sanMax !== undefined ? p.sanMax : maximosCalculados.sanMax;
+      const peMaxFinal = p.peMax !== undefined ? p.peMax : maximosCalculados.peMax;
+
       const forca = (p && p.atributos && p.atributos['FOR']) !== undefined ? p.atributos['FOR'] : 1;
       const cargaMaxima = Math.max(2, forca * 5);
       const itensArray = (p && p.itens) ? Object.entries(p.itens) : [];
@@ -299,7 +334,7 @@
             <button onclick="mudarAba('principal')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'principal' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Ficha & Combate</button>
             <button onclick="mudarAba('pericias')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'pericias' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Perícias</button>
             <button onclick="mudarAba('habilidades')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'habilidades' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Habilidades Especiais</button>
-            <button onclick="mudarAba('rituais')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'rituais' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Rituais</button>
+            <button onclick="mudarAba('rituais')" class="px-3.5. py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'rituais' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Rituais</button>
             <button onclick="mudarAba('historia')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'historia' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">História</button>
             <button onclick="mudarAba('documentos')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1 ${abaAtiva === 'documentos' ? 'bg-cyan-600 text-black font-extrabold shadow' : 'bg-zinc-900 text-cyan-400 hover:bg-zinc-800'}">
               <span>📂</span> Documentos
@@ -439,9 +474,14 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               ${chaves.map(id => {
                 const char = dadosSala[id];
-                const pvPct = Math.min(100, Math.max(0, ((char.pvAtual || 0) / (char.pvMax || 1)) * 100));
-                const sanPct = Math.min(100, Math.max(0, ((char.sanAtual || 0) / (char.sanMax || 1)) * 100));
-                const pePct = Math.min(100, Math.max(0, ((char.peAtual || 0) / (char.peMax || 1)) * 100));
+                const maxC = calcularMaximos(char);
+                const pvMaxC = char.pvMax !== undefined ? char.pvMax : maxC.pvMax;
+                const sanMaxC = char.sanMax !== undefined ? char.sanMax : maxC.sanMax;
+                const peMaxC = char.peMax !== undefined ? char.peMax : maxC.peMax;
+
+                const pvPct = Math.min(100, Math.max(0, ((char.pvAtual || 0) / (pvMaxC || 1)) * 100));
+                const sanPct = Math.min(100, Math.max(0, ((char.sanAtual || 0) / (sanMaxC || 1)) * 100));
+                const pePct = Math.min(100, Math.max(0, ((char.peAtual || 0) / (peMaxC || 1)) * 100));
                 const morrendo = (char.pvAtual || 0) <= 0;
                 const enlouquecendo = (char.sanAtual || 0) <= 0;
 
@@ -450,7 +490,7 @@
                     <div class="flex justify-between items-start border-b border-zinc-800 pb-2">
                       <div>
                         <h3 class="font-bold text-sm text-zinc-100">${char.nome || 'Agente'}</h3>
-                        <span class="text-[10px] text-zinc-400">${char.classe || 'Combatente'} • NEX ${char.nex || '5%'}</span>
+                        <span class="text-[10px] text-zinc-400">${char.classe || 'Combatente'} (${char.trilha || 'Sem Trilha'}) • NEX ${char.nex || '5%'}</span>
                       </div>
                       <span class="text-xs font-bold font-mono text-zinc-200">Def ${char.defesa || 10}</span>
                     </div>
@@ -459,7 +499,7 @@
                         <span class="${morrendo ? 'text-red-500 font-bold' : 'text-red-400'}">PV ${morrendo ? '(MORRENDO!)' : ''}</span>
                         <div class="flex items-center gap-1 font-mono">
                           <button onclick="alterarStatusMestre('${id}', 'pvAtual', -1)" class="bg-zinc-800 px-1 rounded text-[10px]">-1</button>
-                          <span>${char.pvAtual || 0} / ${char.pvMax || 20}</span>
+                          <span>${char.pvAtual || 0} / ${pvMaxC}</span>
                           <button onclick="alterarStatusMestre('${id}', 'pvAtual', 1)" class="bg-zinc-800 px-1 rounded text-[10px]">+1</button>
                         </div>
                       </div>
@@ -470,7 +510,7 @@
                         <span class="${enlouquecendo ? 'text-purple-400 font-bold' : 'text-blue-400'}">SAN ${enlouquecendo ? '(ENLOUQUECENDO!)' : ''}</span>
                         <div class="flex items-center gap-1 font-mono">
                           <button onclick="alterarStatusMestre('${id}', 'sanAtual', -1)" class="bg-zinc-800 px-1 rounded text-[10px]">-1</button>
-                          <span>${char.sanAtual || 0} / ${char.sanMax || 16}</span>
+                          <span>${char.sanAtual || 0} / ${sanMaxC}</span>
                           <button onclick="alterarStatusMestre('${id}', 'sanAtual', 1)" class="bg-zinc-800 px-1 rounded text-[10px]">+1</button>
                         </div>
                       </div>
@@ -481,7 +521,7 @@
                         <span class="text-amber-400">PE</span>
                         <div class="flex items-center gap-1 font-mono">
                           <button onclick="alterarStatusMestre('${id}', 'peAtual', -1)" class="bg-zinc-800 px-1 rounded text-[10px]">-1</button>
-                          <span>${char.peAtual || 0} / ${char.peMax || 4}</span>
+                          <span>${char.peAtual || 0} / ${peMaxC}</span>
                           <button onclick="alterarStatusMestre('${id}', 'peAtual', 1)" class="bg-zinc-800 px-1 rounded text-[10px]">+1</button>
                         </div>
                       </div>
@@ -538,75 +578,6 @@
           </div>
         </div>
 
-        <!-- ABA PERÍCIAS (COM CORES DE DESTAQUE PARA TREINADO, VETERANO E EXPERT) -->
-        <div class="${abaAtiva === 'pericias' ? 'block' : 'hidden'} bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
-          <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
-            <div>
-              <h2 class="text-amber-500 font-bold text-sm uppercase">Perícias de Agente</h2>
-              <p class="text-xs text-zinc-500">Destreinado (+0), <span class="text-emerald-400 font-bold">Treinado (+5)</span>, <span class="text-purple-400 font-bold">Veterano (+10)</span>, <span class="text-red-500 font-bold">Expert (+15)</span></p>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            ${LISTA_PERICIAS.map(pericia => {
-              const dadosPericia = (p.pericias && p.pericias[pericia.nome]) || { grau: 0, bonus: 0 };
-              const grauTreino = parseInt(dadosPericia.grau) || 0;
-              const bonusExtra = parseInt(dadosPericia.bonus) || 0;
-              const totalBonus = grauTreino + bonusExtra;
-              const attrValor = (p.atributos && p.atributos[pericia.attr]) !== undefined ? p.atributos[pericia.attr] : 1;
-
-              // Definir cor de destaque baseada no grau de treino
-              let corDestaque = "text-zinc-500";
-              if (grauTreino === 5) corDestaque = "text-emerald-400 font-bold";
-              else if (grauTreino === 10) corDestaque = "text-purple-400 font-bold";
-              else if (grauTreino === 15) corDestaque = "text-red-500 font-extrabold";
-
-              return `
-                <div class="bg-zinc-950 border border-zinc-800/80 rounded p-2.5 flex items-center justify-between gap-2">
-                  <div class="w-1/3">
-                    <span class="text-xs font-semibold text-zinc-200 block truncate">${pericia.nome}</span>
-                    <span class="text-[10px] text-amber-500 font-mono">${pericia.attr} (${attrValor}d20)</span>
-                  </div>
-                  <div class="flex items-center gap-1.5 w-2/3 justify-end">
-                    <select onchange="atualizarPericia('${pericia.nome}', 'grau', parseInt(this.value))" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-zinc-300">
-                      <option value="0" ${grauTreino === 0 ? 'selected' : ''}>Destr. (+0)</option>
-                      <option value="5" ${grauTreino === 5 ? 'selected' : ''}>Trein. (+5)</option>
-                      <option value="10" ${grauTreino === 10 ? 'selected' : ''}>Vet. (+10)</option>
-                      <option value="15" ${grauTreino === 15 ? 'selected' : ''}>Exp. (+15)</option>
-                    </select>
-                    <input type="number" value="${bonusExtra}" onchange="atualizarPericia('${pericia.nome}', 'bonus', parseInt(this.value) || 0)" class="w-10 bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-center text-xs text-zinc-300" />
-                    <span class="text-xs font-mono w-7 text-right ${corDestaque}">
-                      +${totalBonus}
-                    </span>
-                  </div>
-                </div>
-              `;
-            }).join('')}
-          </div>
-        </div>
-
-        <!-- ABA HISTÓRIA -->
-        <div class="${abaAtiva === 'historia' ? 'block' : 'hidden'} bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
-          <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase">Descrição & Histórico do Agente</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label class="text-xs text-zinc-400 font-semibold block mb-1">Aparência</label>
-              <textarea rows="3" onchange="atualizarCampo('aparencia', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300">${p.aparencia || ''}</textarea>
-            </div>
-            <div>
-              <label class="text-xs text-zinc-400 font-semibold block mb-1">Personalidade</label>
-              <textarea rows="3" onchange="atualizarCampo('personalidade', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300">${p.personalidade || ''}</textarea>
-            </div>
-            <div>
-              <label class="text-xs text-zinc-400 font-semibold block mb-1">Histórico</label>
-              <textarea rows="4" onchange="atualizarCampo('historico', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300">${p.historico || ''}</textarea>
-            </div>
-            <div>
-              <label class="text-xs text-zinc-400 font-semibold block mb-1">Objetivo Pessoal</label>
-              <textarea rows="4" onchange="atualizarCampo('objetivo', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300">${p.objetivo || ''}</textarea>
-            </div>
-          </div>
-        </div>
-
         <!-- ABA 1: PRINCIPAL & COMBATE -->
         <div class="${abaAtiva === 'principal' ? 'block' : 'hidden'} space-y-4">
           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -616,10 +587,6 @@
               <div>
                 <label class="text-xs text-zinc-500">Nome do Agente</label>
                 <input type="text" value="${p.nome || ''}" onchange="atualizarCampo('nome', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
-              </div>
-              <div>
-                <label class="text-xs text-zinc-500">Origem</label>
-                <input type="text" value="${p.origem || ''}" onchange="atualizarCampo('origem', this.value)" placeholder="Ex: Acadêmico, Investigador..." class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -631,49 +598,63 @@
                   <input type="text" value="${p.nex || '5%'}" onchange="atualizarCampo('nex', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
                 </div>
               </div>
+              <div>
+                <label class="text-xs text-zinc-500">Trilha</label>
+                <input type="text" value="${p.trilha || ''}" onchange="atualizarCampo('trilha', this.value)" placeholder="Ex: Aniquilador, Graduado..." class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
+              </div>
+              <div>
+                <label class="text-xs text-zinc-500">Origem</label>
+                <input type="text" value="${p.origem || ''}" onchange="atualizarCampo('origem', this.value)" placeholder="Ex: Acadêmico..." class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
+              </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
                   <label class="text-xs text-zinc-500">Patente</label>
                   <input type="text" value="${p.patente || 'Recruta'}" onchange="atualizarCampo('patente', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
                 </div>
                 <div>
-                  <label class="text-xs text-zinc-500">Limite de Crédito</label>
+                  <label class="text-xs text-zinc-500">Crédito</label>
                   <input type="text" value="${p.credito || 'Baixo'}" onchange="atualizarCampo('credito', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
                 </div>
               </div>
             </div>
 
-            <!-- Pontos Vitais -->
+            <!-- Pontos Vitais (Com cálculo automático por NEX e Atributos) -->
             <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
-              <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase">Pontos Vitais (Em Tempo Real)</h2>
+              <div class="flex items-center justify-between border-b border-zinc-800 pb-1">
+                <h2 class="text-amber-500 font-bold text-sm uppercase">Pontos Vitais</h2>
+                <span class="text-[10px] text-zinc-500 font-mono">Automático por NEX/Atributos</span>
+              </div>
+              <!-- PV -->
               <div>
                 <div class="flex justify-between text-xs font-semibold mb-1">
                   <span class="text-red-400">PONTOS DE VIDA (PV)</span>
-                  <span>${p.pvAtual || 0} / ${p.pvMax || 20}</span>
+                  <span>${p.pvAtual || 0} / ${pvMaxFinal}</span>
                 </div>
                 <div class="flex gap-2">
-                  <input type="number" value="${p.pvAtual || 0}" onchange="atualizarCampo('pvAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-red-900/50 rounded p-1.5 text-center text-red-300 font-bold text-base" />
-                  <input type="number" value="${p.pvMax || 20}" onchange="atualizarCampo('pvMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
+                  <input type="number" value="${p.pvAtual || 0}" onchange="atualizarCampo('pvAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-red-900/50 rounded p-1.5 text-center text-red-300 font-bold text-base" title="PV Atual" />
+                  <input type="number" value="${p.pvMax !== undefined ? p.pvMax : pvMaxFinal}" onchange="atualizarCampo('pvMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" title="PV Máximo (Manual ou Calc)" />
                 </div>
               </div>
+              <!-- SAN -->
               <div>
                 <div class="flex justify-between text-xs font-semibold mb-1">
                   <span class="text-blue-400">SANIDADE (SAN)</span>
-                  <span>${p.sanAtual || 0} / ${p.sanMax || 16}</span>
+                  <span>${p.sanAtual || 0} / ${sanMaxFinal}</span>
                 </div>
                 <div class="flex gap-2">
-                  <input type="number" value="${p.sanAtual || 0}" onchange="atualizarCampo('sanAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-blue-900/50 rounded p-1.5 text-center text-blue-300 font-bold text-base" />
-                  <input type="number" value="${p.sanMax || 16}" onchange="atualizarCampo('sanMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
+                  <input type="number" value="${p.sanAtual || 0}" onchange="atualizarCampo('sanAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-blue-900/50 rounded p-1.5 text-center text-blue-300 font-bold text-base" title="SAN Atual" />
+                  <input type="number" value="${p.sanMax !== undefined ? p.sanMax : sanMaxFinal}" onchange="atualizarCampo('sanMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" title="SAN Máxima" />
                 </div>
               </div>
+              <!-- PE -->
               <div>
                 <div class="flex justify-between text-xs font-semibold mb-1">
                   <span class="text-amber-400">ESFORÇO (PE)</span>
-                  <span>${p.peAtual || 0} / ${p.peMax || 4}</span>
+                  <span>${p.peAtual || 0} / ${peMaxFinal}</span>
                 </div>
                 <div class="flex gap-2">
-                  <input type="number" value="${p.peAtual || 0}" onchange="atualizarCampo('peAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-amber-900/50 rounded p-1.5 text-center text-amber-300 font-bold text-base" />
-                  <input type="number" value="${p.peMax || 4}" onchange="atualizarCampo('peMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
+                  <input type="number" value="${p.peAtual || 0}" onchange="atualizarCampo('peAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-amber-900/50 rounded p-1.5 text-center text-amber-300 font-bold text-base" title="PE Atual" />
+                  <input type="number" value="${p.peMax !== undefined ? p.peMax : peMaxFinal}" onchange="atualizarCampo('peMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" title="PE Máximo" />
                 </div>
               </div>
             </div>
@@ -827,17 +808,18 @@
       const novoRef = db.ref(`mesas/${salaAtual}`).push();
       novoRef.set({
         nome: nomePadrao,
+        trilha: "Aniquilador",
         origem: "Acadêmico",
         classe: "Combatente",
         nex: "5%",
         patente: "Recruta",
         credito: "Baixo",
-        pvAtual: 20,
-        pvMax: 20,
-        sanAtual: 16,
-        sanMax: 16,
-        peAtual: 2,
-        peMax: 2,
+        pvAtual: 22,
+        pvMax: 22,
+        sanAtual: 12,
+        sanMax: 12,
+        peAtual: 4,
+        peMax: 4,
         defesa: 11,
         atributos: { AGI: 2, FOR: 2, INT: 1, PRE: 1, VIG: 2 },
         habilidadesEspeciais: {
