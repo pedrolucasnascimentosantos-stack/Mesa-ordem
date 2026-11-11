@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ordo Realitas - Ficha & Painel do Mestre</title>
+  <title>Ordo Realitas - Ficha & Gestão de Combate</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -80,7 +80,7 @@
     </div>
   </header>
 
-  <!-- Conteúdo -->
+  <!-- Conteúdo Principal -->
   <main class="max-w-6xl mx-auto p-4 space-y-6" id="fichaConteudo">
     <div class="text-center py-20 text-zinc-500">A carregar dados da mesa...</div>
   </main>
@@ -89,7 +89,8 @@
     let salaAtual = "novo-nilo";
     let personagemIdAtual = null;
     let dadosSala = {};
-    let abaAtiva = "principal"; // 'principal', 'pericias', 'historia', 'mestre'
+    let dadosCriaturas = {};
+    let abaAtiva = "principal"; // 'principal', 'pericias', 'historia', 'mestre', 'criaturas'
 
     function conectarSala() {
       const input = document.getElementById("roomInput").value.trim().toLowerCase() || "novo-nilo";
@@ -103,6 +104,7 @@
     }
 
     function ouvirDados() {
+      // Escutar Agentes
       db.ref("mesas/" + salaAtual).on("value", (snapshot) => {
         dadosSala = snapshot.val() || {};
         const chaves = Object.keys(dadosSala);
@@ -119,6 +121,14 @@
         renderizarBarraPersonagens(chaves);
         renderizarFicha();
       });
+
+      // Escutar Criaturas
+      db.ref("criaturas/" + salaAtual).on("value", (snapshot) => {
+        dadosCriaturas = snapshot.val() || {};
+        if (abaAtiva === 'criaturas') {
+          renderizarFicha();
+        }
+      });
     }
 
     function renderizarBarraPersonagens(chaves) {
@@ -126,7 +136,7 @@
       container.innerHTML = "";
       chaves.forEach(id => {
         const p = dadosSala[id];
-        const ativo = id === personagemIdAtual && abaAtiva !== 'mestre';
+        const ativo = id === personagemIdAtual && (abaAtiva !== 'mestre' && abaAtiva !== 'criaturas');
         const btn = document.createElement("button");
         btn.className = `px-3 py-1 rounded text-xs font-semibold border transition ${
           ativo ? "bg-amber-500 text-black border-amber-400 shadow" : "bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700"
@@ -134,7 +144,7 @@
         btn.innerText = p.nome || "Sem Nome";
         btn.onclick = () => {
           personagemIdAtual = id;
-          if (abaAtiva === 'mestre') abaAtiva = 'principal';
+          if (abaAtiva === 'mestre' || abaAtiva === 'criaturas') abaAtiva = 'principal';
           renderizarBarraPersonagens(chaves);
           renderizarFicha();
         };
@@ -148,9 +158,46 @@
       db.ref(`mesas/${salaAtual}/${charId}/${campo}`).set(novo);
     }
 
+    // Funções de Criaturas
+    function criarCriatura() {
+      const novaRef = db.ref(`criaturas/${salaAtual}`).push();
+      novaRef.set({
+        nome: "Zumbi de Sangue",
+        elemento: "Sangue",
+        vd: "20",
+        tamanho: "Médio",
+        pvAtual: 45,
+        pvMax: 45,
+        defesa: 15,
+        rd: "Corte e Impacto 5",
+        vulnerabilidade: "Morte",
+        ataques: "Garras (2d20+5, 1d8+3 dano de corte) • Mordida (2d20+5, 1d10+3 perfuração)",
+        habilidades: "Presença Perturbadora (DT 15, 2d6 SAN) • Faro para Sangue"
+      });
+    }
+
+    function atualizarCriatura(id, campo, valor) {
+      db.ref(`criaturas/${salaAtual}/${id}/${campo}`).set(valor);
+    }
+
+    function alterarPVCriatura(id, delta) {
+      const atual = (dadosCriaturas[id] && dadosCriaturas[id].pvAtual) || 0;
+      const novo = Math.max(0, atual + delta);
+      db.ref(`criaturas/${salaAtual}/${id}/pvAtual`).set(novo);
+    }
+
+    function excluirCriatura(id) {
+      const c = dadosCriaturas[id];
+      const nome = c ? c.nome : "esta criatura";
+      if (confirm(`Remover permanentemente "${nome}" do combate?`)) {
+        db.ref(`criaturas/${salaAtual}/${id}`).remove();
+      }
+    }
+
     function renderizarFicha() {
       const p = dadosSala[personagemIdAtual];
       const chaves = Object.keys(dadosSala);
+      const chavesCriaturas = Object.keys(dadosCriaturas);
 
       const forca = (p && p.atributos && p.atributos['FOR']) !== undefined ? p.atributos['FOR'] : 1;
       const cargaMaxima = Math.max(2, forca * 5);
@@ -169,9 +216,107 @@
           <button onclick="mudarAba('mestre')" class="px-4 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1.5 ${abaAtiva === 'mestre' ? 'bg-red-600 text-white shadow-lg shadow-red-950' : 'bg-zinc-900 text-red-400 hover:bg-zinc-800'}">
             <span>🛡️</span> PAINEL DO MESTRE
           </button>
+          <button onclick="mudarAba('criaturas')" class="px-4 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1.5 ${abaAtiva === 'criaturas' ? 'bg-purple-600 text-white shadow-lg shadow-purple-950' : 'bg-zinc-900 text-purple-400 hover:bg-zinc-800'}">
+            <span>👁️</span> AMEAÇAS & CRIATURAS
+          </button>
         </div>
 
-        <!-- ABA MESTRE: VISÃO GERAL DE TODOS OS AGENTES -->
+        <!-- ABA CRIATURAS: BESTIÁRIO E COMBATE -->
+        <div class="${abaAtiva === 'criaturas' ? 'block' : 'hidden'} space-y-6">
+          <div class="bg-zinc-900 border border-purple-900/60 rounded p-4">
+            <div class="flex flex-wrap items-center justify-between border-b border-zinc-800 pb-3 mb-4 gap-3">
+              <div>
+                <h2 class="text-purple-400 font-bold uppercase tracking-wide text-base">Ameaças & Criaturas do Outro Lado</h2>
+                <p class="text-xs text-zinc-400">Gestão de monstros, entidades e perigos paranormais no encontro atual.</p>
+              </div>
+              <button onclick="criarCriatura()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-3 py-1.5 rounded transition shadow">
+                + Nova Criatura
+              </button>
+            </div>
+
+            ${chavesCriaturas.length === 0 ? `
+              <div class="text-center py-12 text-zinc-600 text-sm">
+                Nenhuma criatura adicionada à sala de combate. Clique em "+ Nova Criatura" para invocar uma ameaça.
+              </div>
+            ` : `
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${chavesCriaturas.map(id => {
+                  const c = dadosCriaturas[id];
+                  const pvPct = Math.min(100, Math.max(0, ((c.pvAtual || 0) / (c.pvMax || 1)) * 100));
+                  const derrotado = (c.pvAtual || 0) <= 0;
+
+                  return `
+                    <div class="bg-zinc-950 border ${derrotado ? 'border-zinc-800 opacity-60' : 'border-purple-950/80'} rounded p-4 space-y-3 relative">
+                      <div class="flex justify-between items-start border-b border-zinc-800 pb-2">
+                        <div class="w-2/3">
+                          <input type="text" value="${c.nome || ''}" onchange="atualizarCriatura('${id}', 'nome', this.value)" class="bg-transparent font-bold text-base text-purple-300 w-full focus:outline-none focus:border-b border-purple-500" placeholder="Nome da Criatura" />
+                          <div class="flex gap-2 text-[11px] text-zinc-400 mt-1">
+                            <input type="text" value="${c.elemento || 'Sangue'}" onchange="atualizarCriatura('${id}', 'elemento', this.value)" class="bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-zinc-300 w-24" placeholder="Elemento" />
+                            <span class="self-center">VD:</span>
+                            <input type="text" value="${c.vd || '20'}" onchange="atualizarCriatura('${id}', 'vd', this.value)" class="bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-amber-400 font-mono w-14" placeholder="VD" />
+                            <input type="text" value="${c.tamanho || 'Médio'}" onchange="atualizarCriatura('${id}', 'tamanho', this.value)" class="bg-zinc-900 border border-zinc-800 rounded px-1.5 py-0.5 text-zinc-400 w-16" placeholder="Tamanho" />
+                          </div>
+                        </div>
+                        <button onclick="excluirCriatura('${id}')" class="text-zinc-600 hover:text-red-400 text-xs font-bold px-2 py-1">✕ Excluir</button>
+                      </div>
+
+                      <!-- Barra de PV -->
+                      <div>
+                        <div class="flex justify-between text-xs font-semibold mb-1">
+                          <span class="text-red-400">PONTOS DE VIDA (PV) ${derrotado ? '— DERROTADO' : ''}</span>
+                          <div class="flex items-center gap-1 font-mono text-[11px]">
+                            <button onclick="alterarPVCriatura('${id}', -5)" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">-5</button>
+                            <button onclick="alterarPVCriatura('${id}', -1)" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">-1</button>
+                            <span class="px-1 text-zinc-200 font-bold">${c.pvAtual || 0} / ${c.pvMax || 45}</span>
+                            <button onclick="alterarPVCriatura('${id}', 1)" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">+1</button>
+                            <button onclick="alterarPVCriatura('${id}', 5)" class="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-1.5 py-0.5 rounded text-zinc-300">+5</button>
+                          </div>
+                        </div>
+                        <div class="w-full bg-zinc-900 rounded-full h-2.5 overflow-hidden border border-zinc-800">
+                          <div class="bg-red-600 h-full transition-all duration-300" style="width: ${pvPct}%"></div>
+                        </div>
+                        <div class="flex gap-2 mt-1">
+                          <input type="number" value="${c.pvAtual || 0}" onchange="atualizarCriatura('${id}', 'pvAtual', parseInt(this.value))" placeholder="PV Atual" class="w-1/2 bg-zinc-900 border border-zinc-800 rounded p-1 text-center text-xs text-red-300 font-bold" />
+                          <input type="number" value="${c.pvMax || 45}" onchange="atualizarCriatura('${id}', 'pvMax', parseInt(this.value))" placeholder="PV Máx" class="w-1/2 bg-zinc-900 border border-zinc-800 rounded p-1 text-center text-xs text-zinc-500" />
+                        </div>
+                      </div>
+
+                      <!-- Defesas e Resistências -->
+                      <div class="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <label class="text-[10px] text-zinc-500 block">Defesa</label>
+                          <input type="number" value="${c.defesa || 15}" onchange="atualizarCriatura('${id}', 'defesa', parseInt(this.value))" class="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-center font-bold text-zinc-200" />
+                        </div>
+                        <div>
+                          <label class="text-[10px] text-zinc-500 block">Resistências (RD)</label>
+                          <input type="text" value="${c.rd || ''}" onchange="atualizarCriatura('${id}', 'rd', this.value)" placeholder="Corte 5..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-center text-zinc-300" />
+                        </div>
+                        <div>
+                          <label class="text-[10px] text-zinc-500 block">Vulnerabilidade</label>
+                          <input type="text" value="${c.vulnerabilidade || ''}" onchange="atualizarCriatura('${id}', 'vulnerabilidade', this.value)" placeholder="Morte..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-1 text-center text-purple-300" />
+                        </div>
+                      </div>
+
+                      <!-- Ataques -->
+                      <div>
+                        <label class="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Ataques</label>
+                        <textarea rows="2" onchange="atualizarCriatura('${id}', 'ataques', this.value)" class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-300 font-mono focus:outline-none focus:border-purple-500" placeholder="Ex: Garras (2d20+5, 1d8+3 corte)...">${c.ataques || ''}</textarea>
+                      </div>
+
+                      <!-- Habilidades e Enigma de Medo -->
+                      <div>
+                        <label class="text-[10px] text-zinc-500 font-bold uppercase block mb-1">Habilidades / Enigma do Medo</label>
+                        <textarea rows="2" onchange="atualizarCriatura('${id}', 'habilidades', this.value)" class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-400 focus:outline-none focus:border-purple-500" placeholder="Presença Perturbadora, imunidades, regras especiais...">${c.habilidades || ''}</textarea>
+                      </div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            `}
+          </div>
+        </div>
+
+        <!-- ABA MESTRE: MONITORAMENTO GERAL -->
         <div class="${abaAtiva === 'mestre' ? 'block' : 'hidden'} space-y-6">
           <div class="bg-zinc-900 border border-red-900/60 rounded p-4">
             <div class="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
