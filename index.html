@@ -249,7 +249,7 @@
       }
     }
 
-    // Rituais e Poderes
+    // Rituais
     function adicionarRitual() {
       if (!personagemIdAtual) return;
       db.ref(`mesas/${salaAtual}/${personagemIdAtual}/rituals`).push({ nome: "Novo Ritual", elemento: "Conhecimento", circulo: "1º", pe: "1", efeito: "Descrição..." });
@@ -263,17 +263,18 @@
       db.ref(`mesas/${salaAtual}/${personagemIdAtual}/rituals/${id}`).remove();
     }
 
-    function adicionarPoder() {
+    // Habilidades Especiais
+    function adicionarHabilidadeEspecial() {
       if (!personagemIdAtual) return;
-      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/powers`).push({ nome: "Novo Poder", desc: "Descrição..." });
+      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/habilidadesEspeciais`).push({ nome: "Nova Habilidade Especial", desc: "Regras e descrição..." });
     }
-    function atualizarPoder(id, campo, valor) {
+    function atualizarHabilidadeEspecial(id, campo, valor) {
       if (!personagemIdAtual) return;
-      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/powers/${id}/${campo}`).set(valor);
+      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/habilidadesEspeciais/${id}/${campo}`).set(valor);
     }
-    function removerPoder(id) {
+    function removerHabilidadeEspecial(id) {
       if (!personagemIdAtual) return;
-      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/powers/${id}`).remove();
+      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/habilidadesEspeciais/${id}`).remove();
     }
 
     function renderizarFicha() {
@@ -288,24 +289,25 @@
       const cargaAtual = itensArray.reduce((acc, [_, item]) => acc + (parseFloat(item.espacos) || 0), 0);
       const armasArray = (p && p.armas) ? Object.entries(p.armas) : [];
       const rituaisArray = (p && p.rituals) ? Object.entries(p.rituals) : [];
-      const poderesArray = (p && p.powers) ? Object.entries(p.powers) : [];
+      const habEspArray = (p && p.habilidadesEspeciais) ? Object.entries(p.habilidadesEspeciais) : [];
 
       const main = document.getElementById("fichaConteudo");
       main.innerHTML = `
         <!-- Seletor de Abas -->
         <div class="flex flex-wrap items-center justify-between border-b border-zinc-800 gap-2 pb-2">
           <div class="flex flex-wrap gap-2">
-            <button onclick="mudarAba('principal')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'principal' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Ficha & Combate</button>
-            <button onclick="mudarAba('pericias')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'pericias' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Perícias (28)</button>
-            <button onclick="mudarAba('rituais')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'rituais' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Rituais & Poderes</button>
-            <button onclick="mudarAba('historia')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'historia' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">História & Descrição</button>
-            <button onclick="mudarAba('documentos')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1 ${abaAtiva === 'documentos' ? 'bg-cyan-600 text-black font-extrabold shadow' : 'bg-zinc-900 text-cyan-400 hover:bg-zinc-800'}">
+            <button onclick="mudarAba('principal')" class="px-3 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'principal' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Ficha & Combate</button>
+            <button onclick="mudarAba('pericias')" class="px-3 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'pericias' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Perícias</button>
+            <button onclick="mudarAba('habilidades')" class="px-3.5. py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'habilidades' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Habilidades Especiais</button>
+            <button onclick="mudarAba('rituais')" class="px-3 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'rituais' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Rituais</button>
+            <button onclick="mudarAba('historia')" class="px-3 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'historia' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">História</button>
+            <button onclick="mudarAba('documentos')" class="px-3 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1 ${abaAtiva === 'documentos' ? 'bg-cyan-600 text-black font-extrabold shadow' : 'bg-zinc-900 text-cyan-400 hover:bg-zinc-800'}">
               <span>📂</span> Documentos
             </button>
-            <button onclick="mudarAba('mestre')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1.5 ${abaAtiva === 'mestre' ? 'bg-red-600 text-white shadow-lg' : 'bg-zinc-900 text-red-400 hover:bg-zinc-800'}">
-              <span>${mestreAutenticado ? '🔓' : '🔒'}</span> Escudo do Mestre
+            <button onclick="mudarAba('mestre')" class="px-3 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1.5 ${abaAtiva === 'mestre' ? 'bg-red-600 text-white shadow-lg' : 'bg-zinc-900 text-red-400 hover:bg-zinc-800'}">
+              <span>${mestreAutenticado ? '🔓' : '🔒'}</span> Mestre
             </button>
-            <button onclick="mudarAba('criaturas')" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1.5 ${abaAtiva === 'criaturas' ? 'bg-purple-600 text-white shadow-lg' : 'bg-zinc-900 text-purple-400 hover:bg-zinc-800'}">
+            <button onclick="mudarAba('criaturas')" class="px-3 py-1.5 rounded text-xs font-bold uppercase transition flex items-center gap-1.5 ${abaAtiva === 'criaturas' ? 'bg-purple-600 text-white shadow-lg' : 'bg-zinc-900 text-purple-400 hover:bg-zinc-800'}">
               <span>${mestreAutenticado ? '🔓' : '🔒'}</span> Ameaças
             </button>
           </div>
@@ -317,7 +319,30 @@
           ` : ''}
         </div>
 
-        <!-- ABA RITUAIS & PODERES -->
+        <!-- ABA HABILIDADES ESPECIAIS -->
+        <div class="${abaAtiva === 'habilidades' ? 'block' : 'hidden'} space-y-4">
+          <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
+            <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+              <h2 class="text-amber-500 font-bold text-sm uppercase">Habilidades Especiais & Aptidões</h2>
+              <button onclick="adicionarHabilidadeEspecial()" class="bg-amber-600 hover:bg-amber-500 text-black text-xs font-semibold px-2.5 py-1 rounded transition">+ Nova Habilidade</button>
+            </div>
+            <div class="space-y-3">
+              ${habEspArray.length === 0 ? `
+                <div class="text-center py-6 text-zinc-600 text-xs">Nenhuma habilidade especial registada.</div>
+              ` : habEspArray.map(([idH, h]) => `
+                <div class="bg-zinc-950 border border-zinc-800 rounded p-3 space-y-2">
+                  <div class="flex items-center gap-2">
+                    <input type="text" value="${h.nome || ''}" onchange="atualizarHabilidadeEspecial('${idH}', 'nome', this.value)" placeholder="Nome da Habilidade" class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-amber-300 font-bold" />
+                    <button onclick="removerHabilidadeEspecial('${idH}')" class="text-red-500 hover:text-red-400 font-bold px-2 py-1 text-xs">✕</button>
+                  </div>
+                  <textarea rows="3" onchange="atualizarHabilidadeEspecial('${idH}', 'desc', this.value)" placeholder="Descrição completa, bónus e mecânicas da habilidade..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-300 focus:outline-none focus:border-amber-500">${h.desc || ''}</textarea>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA RITUAIS -->
         <div class="${abaAtiva === 'rituais' ? 'block' : 'hidden'} space-y-6">
           <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
             <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
@@ -350,26 +375,6 @@
                     </div>
                   </div>
                   <textarea rows="2" onchange="atualizarRitual('${idR}', 'efeito', this.value)" placeholder="Efeito..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-300 font-mono">${r.efeito || ''}</textarea>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-
-          <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
-            <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <h2 class="text-amber-500 font-bold text-sm uppercase">Poderes Paranormais & Habilidades</h2>
-              <button onclick="adicionarPoder()" class="bg-amber-600 hover:bg-amber-500 text-black text-xs font-semibold px-2.5 py-1 rounded transition">+ Novo Poder</button>
-            </div>
-            <div class="space-y-3">
-              ${poderesArray.length === 0 ? `
-                <div class="text-center py-6 text-zinc-600 text-xs">Nenhum poder registado.</div>
-              ` : poderesArray.map(([idP, pod]) => `
-                <div class="bg-zinc-950 border border-zinc-800 rounded p-3 space-y-2">
-                  <div class="flex items-center gap-2">
-                    <input type="text" value="${pod.nome || ''}" onchange="atualizarPoder('${idP}', 'nome', this.value)" placeholder="Nome" class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-amber-300 font-bold" />
-                    <button onclick="removerPoder('${idP}')" class="text-red-500 font-bold px-2 py-1 text-xs">✕</button>
-                  </div>
-                  <textarea rows="2" onchange="atualizarPoder('${idP}', 'desc', this.value)" placeholder="Descrição..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-400">${pod.desc || ''}</textarea>
                 </div>
               `).join('')}
             </div>
@@ -812,22 +817,24 @@
       novoRef.set({
         nome: nomePadrao,
         origem: "Acadêmico",
-        classe: "Ocultista",
+        classe: "Combatente",
         nex: "5%",
         patente: "Recruta",
         credito: "Baixo",
-        pvAtual: 12,
-        pvMax: 12,
-        sanAtual: 20,
-        sanMax: 20,
-        peAtual: 6,
-        peMax: 6,
-        defesa: 10,
-        atributos: { AGI: 1, FOR: 1, INT: 3, PRE: 2, VIG: 1 },
+        pvAtual: 20,
+        pvMax: 20,
+        sanAtual: 16,
+        sanMax: 16,
+        peAtual: 2,
+        peMax: 2,
+        defesa: 11,
+        atributos: { AGI: 2, FOR: 2, INT: 1, PRE: 1, VIG: 2 },
+        habilidadesEspeciais: {
+          hab_1: { nome: "Ataque Especial", desc: "Gasta 2 PE para somar +10 no teste de ataque ou no dano." }
+        },
         rituals: { ritual_1: { nome: "Espirais da Perdição", elemento: "Morte", circulo: "1º", pe: "1", efeito: "Alcance curto." } },
-        powers: { power_1: { nome: "Técnica Ocultista", desc: "+2 em Ocultismo." } },
-        armas: { arma_1: { nome: "Adaga", teste: "Luta", dano: "1d4", critico: "19/x2", alcance: "Corpo a corpo", especial: "Leve" } },
-        itens: { item_1: { nome: "Componentes Ritualísticos", categoria: "I", espacos: 1, detalhes: "Essencial" } },
+        armas: { arma_1: { nome: "Revólver .38", teste: "Pontaria", dano: "2d6", critico: "19/x3", alcance: "Curto", especial: "Balístico" } },
+        itens: { item_1: { nome: "Vestimenta Leve", categoria: "I", espacos: 2, detalhes: "+2 Defesa" } },
         aparencia: "", personalidade: "", historico: "", objetivo: ""
       });
       personagemIdAtual = novoRef.key;
