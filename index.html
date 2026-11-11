@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Ordo Realitas - Fichas da Mesa</title>
+  <title>Ordo Realitas - Ficha de Agente</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
-<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans">
+<body class="bg-zinc-950 text-zinc-100 min-h-screen font-sans pb-12">
 
   <script>
     const firebaseConfig = {
@@ -22,6 +22,37 @@
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    const LISTA_PERICIAS = [
+      { nome: "Acrobacia", attr: "AGI", carga: false },
+      { nome: "Adestramento", attr: "PRE", carga: false },
+      { nome: "Artes", attr: "PRE", carga: false },
+      { nome: "Atletismo", attr: "FOR", carga: false },
+      { nome: "Atualidades", attr: "INT", carga: false },
+      { nome: "Ciências", attr: "INT", carga: false },
+      { nome: "Crime", attr: "AGI", carga: true },
+      { nome: "Diplomacia", attr: "PRE", carga: false },
+      { nome: "Enganação", attr: "PRE", carga: false },
+      { nome: "Fortitude", attr: "VIG", carga: false },
+      { nome: "Furtividade", attr: "AGI", carga: true },
+      { nome: "Iniciativa", attr: "AGI", carga: false },
+      { nome: "Intimidação", attr: "PRE", carga: false },
+      { nome: "Intuição", attr: "PRE", carga: false },
+      { nome: "Investigação", attr: "INT", carga: false },
+      { nome: "Luta", attr: "FOR", carga: false },
+      { nome: "Medicina", attr: "INT", carga: false },
+      { nome: "Ocultismo", attr: "INT", carga: false },
+      { nome: "Percepção", attr: "PRE", carga: false },
+      { nome: "Pilotagem", attr: "AGI", carga: false },
+      { nome: "Pontaria", attr: "AGI", carga: false },
+      { nome: "Profissão", attr: "INT", carga: false },
+      { nome: "Reflexos", attr: "AGI", carga: false },
+      { nome: "Religião", attr: "PRE", carga: false },
+      { nome: "Sobrevivência", attr: "INT", carga: false },
+      { nome: "Tática", attr: "INT", carga: false },
+      { nome: "Tecnologia", attr: "INT", carga: false },
+      { nome: "Vontade", attr: "PRE", carga: false }
+    ];
   </script>
 
   <!-- Cabeçalho de Navegação e Salas -->
@@ -45,7 +76,7 @@
   </header>
 
   <!-- Conteúdo Principal da Ficha -->
-  <main class="max-w-6xl mx-auto p-4" id="fichaConteudo">
+  <main class="max-w-6xl mx-auto p-4 space-y-6" id="fichaConteudo">
     <div class="text-center py-20 text-zinc-500">A carregar dados da mesa...</div>
   </main>
 
@@ -53,11 +84,17 @@
     let salaAtual = "novo-nilo";
     let personagemIdAtual = null;
     let dadosSala = {};
+    let abaAtiva = "principal"; // 'principal', 'pericias', 'historia'
 
     function conectarSala() {
       const input = document.getElementById("roomInput").value.trim().toLowerCase() || "novo-nilo";
       salaAtual = input;
       ouvirDados();
+    }
+
+    function mudarAba(aba) {
+      abaAtiva = aba;
+      renderizarFicha();
     }
 
     function ouvirDados() {
@@ -103,7 +140,7 @@
       const p = dadosSala[personagemIdAtual];
       if (!p) return;
 
-      const forca = (p.atributos && p.atributos['FOR']) || 1;
+      const forca = (p.atributos && p.atributos['FOR']) !== undefined ? p.atributos['FOR'] : 1;
       const cargaMaxima = Math.max(2, forca * 5);
       
       const itensArray = p.itens ? Object.entries(p.itens) : [];
@@ -111,149 +148,220 @@
 
       const main = document.getElementById("fichaConteudo");
       main.innerHTML = `
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <!-- Bloco 1: Identificação -->
-          <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-3">
-            <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase">Identificação</h2>
-            <div>
-              <label class="text-xs text-zinc-500">Nome do Agente</label>
-              <input type="text" value="${p.nome || ''}" onchange="atualizarCampo('nome', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="text-xs text-zinc-500">Classe</label>
-                <input type="text" value="${p.classe || 'Combatente'}" onchange="atualizarCampo('classe', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
-              </div>
-              <div>
-                <label class="text-xs text-zinc-500">NEX (%)</label>
-                <input type="text" value="${p.nex || '5%'}" onchange="atualizarCampo('nex', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-2">
-              <div>
-                <label class="text-xs text-zinc-500">Patente</label>
-                <input type="text" value="${p.patente || 'Recruta'}" onchange="atualizarCampo('patente', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
-              </div>
-              <div>
-                <label class="text-xs text-zinc-500">Limite de Crédito</label>
-                <input type="text" value="${p.credito || 'Baixo'}" onchange="atualizarCampo('credito', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
-              </div>
-            </div>
-          </div>
+        <!-- Abas de Navegação Internas -->
+        <div class="flex border-b border-zinc-800 gap-2 pb-2">
+          <button onclick="mudarAba('principal')" class="px-4 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'principal' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Ficha Principal & Inventário</button>
+          <button onclick="mudarAba('pericias')" class="px-4 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'pericias' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">Perícias (28)</button>
+          <button onclick="mudarAba('historia')" class="px-4 py-1.5 rounded text-xs font-bold uppercase transition ${abaAtiva === 'historia' ? 'bg-amber-500 text-black' : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200'}">História & Descrição</button>
+        </div>
 
-          <!-- Bloco 2: Pontos Vitais -->
-          <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
-            <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase">Pontos Vitais (Em Tempo Real)</h2>
-            <!-- PV -->
-            <div>
-              <div class="flex justify-between text-xs font-semibold mb-1">
-                <span class="text-red-400">PONTOS DE VIDA (PV)</span>
-                <span>${p.pvAtual || 0} / ${p.pvMax || 20}</span>
+        <!-- ABA 1: PRINCIPAL & INVENTÁRIO -->
+        <div class="${abaAtiva === 'principal' ? 'block' : 'hidden'} space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- Bloco 1: Identificação -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-3">
+              <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase">Identificação</h2>
+              <div>
+                <label class="text-xs text-zinc-500">Nome do Agente</label>
+                <input type="text" value="${p.nome || ''}" onchange="atualizarCampo('nome', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
               </div>
-              <div class="flex gap-2">
-                <input type="number" value="${p.pvAtual || 0}" onchange="atualizarCampo('pvAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-red-900/50 rounded p-1.5 text-center text-red-300 font-bold text-base" />
-                <input type="number" value="${p.pvMax || 20}" onchange="atualizarCampo('pvMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
-              </div>
-            </div>
-            <!-- SAN -->
-            <div>
-              <div class="flex justify-between text-xs font-semibold mb-1">
-                <span class="text-blue-400">SANIDADE (SAN)</span>
-                <span>${p.sanAtual || 0} / ${p.sanMax || 16}</span>
-              </div>
-              <div class="flex gap-2">
-                <input type="number" value="${p.sanAtual || 0}" onchange="atualizarCampo('sanAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-blue-900/50 rounded p-1.5 text-center text-blue-300 font-bold text-base" />
-                <input type="number" value="${p.sanMax || 16}" onchange="atualizarCampo('sanMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
-              </div>
-            </div>
-            <!-- PE -->
-            <div>
-              <div class="flex justify-between text-xs font-semibold mb-1">
-                <span class="text-amber-400">ESFORÇO (PE)</span>
-                <span>${p.peAtual || 0} / ${p.peMax || 4}</span>
-              </div>
-              <div class="flex gap-2">
-                <input type="number" value="${p.peAtual || 0}" onchange="atualizarCampo('peAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-amber-900/50 rounded p-1.5 text-center text-amber-300 font-bold text-base" />
-                <input type="number" value="${p.peMax || 4}" onchange="atualizarCampo('peMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Bloco 3: Atributos & Defesa -->
-          <div class="bg-zinc-900 border border-zinc-800 rounded p-4">
-            <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase mb-3">Atributos</h2>
-            <div class="grid grid-cols-5 gap-1 text-center">
-              ${['AGI', 'FOR', 'INT', 'PRE', 'VIG'].map(attr => `
-                <div class="bg-zinc-950 p-2 rounded border border-zinc-800">
-                  <span class="text-[10px] text-zinc-500 font-bold block">${attr}</span>
-                  <input type="number" value="${(p.atributos && p.atributos[attr]) !== undefined ? p.atributos[attr] : 1}" onchange="atualizarAtributo('${attr}', parseInt(this.value))" class="w-full bg-transparent text-center font-bold text-amber-400 text-base focus:outline-none" />
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs text-zinc-500">Classe</label>
+                  <input type="text" value="${p.classe || 'Combatente'}" onchange="atualizarCampo('classe', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
                 </div>
-              `).join('')}
+                <div>
+                  <label class="text-xs text-zinc-500">NEX (%)</label>
+                  <input type="text" value="${p.nex || '5%'}" onchange="atualizarCampo('nex', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="text-xs text-zinc-500">Patente</label>
+                  <input type="text" value="${p.patente || 'Recruta'}" onchange="atualizarCampo('patente', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
+                </div>
+                <div>
+                  <label class="text-xs text-zinc-500">Limite de Crédito</label>
+                  <input type="text" value="${p.credito || 'Baixo'}" onchange="atualizarCampo('credito', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm" />
+                </div>
+              </div>
             </div>
-            <div class="mt-4">
-              <label class="text-xs text-zinc-500">Defesa Passiva</label>
-              <input type="number" value="${p.defesa || 10}" onchange="atualizarCampo('defesa', parseInt(this.value))" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-center font-bold text-zinc-200" />
+
+            <!-- Bloco 2: Pontos Vitais -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
+              <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase">Pontos Vitais (Em Tempo Real)</h2>
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-red-400">PONTOS DE VIDA (PV)</span>
+                  <span>${p.pvAtual || 0} / ${p.pvMax || 20}</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="number" value="${p.pvAtual || 0}" onchange="atualizarCampo('pvAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-red-900/50 rounded p-1.5 text-center text-red-300 font-bold text-base" />
+                  <input type="number" value="${p.pvMax || 20}" onchange="atualizarCampo('pvMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-blue-400">SANIDADE (SAN)</span>
+                  <span>${p.sanAtual || 0} / ${p.sanMax || 16}</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="number" value="${p.sanAtual || 0}" onchange="atualizarCampo('sanAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-blue-900/50 rounded p-1.5 text-center text-blue-300 font-bold text-base" />
+                  <input type="number" value="${p.sanMax || 16}" onchange="atualizarCampo('sanMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs font-semibold mb-1">
+                  <span class="text-amber-400">ESFORÇO (PE)</span>
+                  <span>${p.peAtual || 0} / ${p.peMax || 4}</span>
+                </div>
+                <div class="flex gap-2">
+                  <input type="number" value="${p.peAtual || 0}" onchange="atualizarCampo('peAtual', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-amber-900/50 rounded p-1.5 text-center text-amber-300 font-bold text-base" />
+                  <input type="number" value="${p.peMax || 4}" onchange="atualizarCampo('peMax', parseInt(this.value))" class="w-1/2 bg-zinc-950 border border-zinc-800 rounded p-1.5 text-center text-xs text-zinc-400" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Bloco 3: Atributos & Defesa -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded p-4">
+              <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase mb-3">Atributos</h2>
+              <div class="grid grid-cols-5 gap-1 text-center">
+                ${['AGI', 'FOR', 'INT', 'PRE', 'VIG'].map(attr => `
+                  <div class="bg-zinc-950 p-2 rounded border border-zinc-800">
+                    <span class="text-[10px] text-zinc-500 font-bold block">${attr}</span>
+                    <input type="number" value="${(p.atributos && p.atributos[attr]) !== undefined ? p.atributos[attr] : 1}" onchange="atualizarAtributo('${attr}', parseInt(this.value))" class="w-full bg-transparent text-center font-bold text-amber-400 text-base focus:outline-none" />
+                  </div>
+                `).join('')}
+              </div>
+              <div class="mt-4">
+                <label class="text-xs text-zinc-500">Defesa Passiva</label>
+                <input type="number" value="${p.defesa || 10}" onchange="atualizarCampo('defesa', parseInt(this.value))" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-center font-bold text-zinc-200" />
+              </div>
+            </div>
+
+            <!-- Bloco 4: Inventário Detalhado Oficial -->
+            <div class="md:col-span-3 bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
+              <div class="flex flex-wrap items-center justify-between border-b border-zinc-800 pb-2 gap-2">
+                <div class="flex items-center gap-3">
+                  <h2 class="text-amber-500 font-bold text-sm uppercase">Inventário & Carga</h2>
+                  <span class="text-xs px-2 py-0.5 rounded font-mono ${cargaAtual > cargaMaxima ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-zinc-800 text-zinc-300'}">
+                    Carga: ${cargaAtual} / ${cargaMaxima} espaços
+                  </span>
+                </div>
+                <button onclick="adicionarItem()" class="bg-amber-600 hover:bg-amber-500 text-black text-xs font-semibold px-2.5 py-1 rounded transition">
+                  + Adicionar Item
+                </button>
+              </div>
+
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead>
+                    <tr class="text-zinc-500 border-b border-zinc-800 font-mono uppercase">
+                      <th class="pb-2 w-1/3">Item</th>
+                      <th class="pb-2 w-20 text-center">Categoria</th>
+                      <th class="pb-2 w-16 text-center">Espaços</th>
+                      <th class="pb-2">Detalhes / Descrição</th>
+                      <th class="pb-2 w-10 text-center">Ação</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-zinc-800/60">
+                    ${itensArray.length === 0 ? `
+                      <tr>
+                        <td colspan="5" class="py-6 text-center text-zinc-600">Nenhum item adicionado ao inventário deste agente.</td>
+                      </tr>
+                    ` : itensArray.map(([idItem, item]) => `
+                      <tr>
+                        <td class="py-2 pr-2">
+                          <input type="text" value="${item.nome || ''}" onchange="atualizarItem('${idItem}', 'nome', this.value)" placeholder="Nome do item" class="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-medium" />
+                        </td>
+                        <td class="py-2 px-1 text-center">
+                          <select onchange="atualizarItem('${idItem}', 'categoria', this.value)" class="bg-zinc-950 border border-zinc-800 rounded px-1.5 py-1 text-zinc-300 w-full text-center">
+                            <option value="0" ${item.categoria == '0' ? 'selected' : ''}>0</option>
+                            <option value="I" ${item.categoria == 'I' ? 'selected' : ''}>I</option>
+                            <option value="II" ${item.categoria == 'II' ? 'selected' : ''}>II</option>
+                            <option value="III" ${item.categoria == 'III' ? 'selected' : ''}>III</option>
+                            <option value="IV" ${item.categoria == 'IV' ? 'selected' : ''}>IV</option>
+                          </select>
+                        </td>
+                        <td class="py-2 px-1 text-center">
+                          <input type="number" step="0.5" value="${item.espacos !== undefined ? item.espacos : 1}" onchange="atualizarItem('${idItem}', 'espacos', parseFloat(this.value) || 0)" class="w-full bg-zinc-950 border border-zinc-800 rounded px-1.5 py-1 text-center text-zinc-200" />
+                        </td>
+                        <td class="py-2 px-2">
+                          <input type="text" value="${item.detalhes || ''}" onchange="atualizarItem('${idItem}', 'detalhes', this.value)" placeholder="Dano, munição, efeitos..." class="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-400" />
+                        </td>
+                        <td class="py-2 text-center">
+                          <button onclick="removerItem('${idItem}')" class="text-red-500 hover:text-red-400 font-bold px-2 py-1">✕</button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABA 2: PERÍCIAS (28 OFICIAIS) -->
+        <div class="${abaAtiva === 'pericias' ? 'block' : 'hidden'} bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+            <div>
+              <h2 class="text-amber-500 font-bold text-sm uppercase">Perícias de Agente</h2>
+              <p class="text-xs text-zinc-500">Treinamento: Destreinado (+0), Treinado (+5), Veterano (+10), Expert (+15)</p>
             </div>
           </div>
 
-          <!-- Bloco 4: Inventário Detalhado Oficial -->
-          <div class="md:col-span-3 bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
-            <div class="flex flex-wrap items-center justify-between border-b border-zinc-800 pb-2 gap-2">
-              <div class="flex items-center gap-3">
-                <h2 class="text-amber-500 font-bold text-sm uppercase">Inventário & Carga</h2>
-                <span class="text-xs px-2 py-0.5 rounded font-mono ${cargaAtual > cargaMaxima ? 'bg-red-950 text-red-400 border border-red-800' : 'bg-zinc-800 text-zinc-300'}">
-                  Carga: ${cargaAtual} / ${cargaMaxima} espaços
-                </span>
-              </div>
-              <button onclick="adicionarItem()" class="bg-amber-600 hover:bg-amber-500 text-black text-xs font-semibold px-2.5 py-1 rounded transition">
-                + Adicionar Item
-              </button>
-            </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            ${LISTA_PERICIAS.map(pericia => {
+              const dadosPericia = (p.pericias && p.pericias[pericia.nome]) || { grau: 0, bonus: 0 };
+              const grauTreino = parseInt(dadosPericia.grau) || 0;
+              const bonusExtra = parseInt(dadosPericia.bonus) || 0;
+              const totalBonus = grauTreino + bonusExtra;
+              const attrValor = (p.atributos && p.atributos[pericia.attr]) !== undefined ? p.atributos[pericia.attr] : 1;
 
-            <!-- Tabela de Itens -->
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-xs">
-                <thead>
-                  <tr class="text-zinc-500 border-b border-zinc-800 font-mono uppercase">
-                    <th class="pb-2 w-1/3">Item</th>
-                    <th class="pb-2 w-20 text-center">Categoria</th>
-                    <th class="pb-2 w-16 text-center">Espaços</th>
-                    <th class="pb-2">Detalhes / Descrição</th>
-                    <th class="pb-2 w-10 text-center">Ação</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-zinc-800/60">
-                  ${itensArray.length === 0 ? `
-                    <tr>
-                      <td colspan="5" class="py-6 text-center text-zinc-600">Nenhum item adicionado ao inventário deste agente.</td>
-                    </tr>
-                  ` : itensArray.map(([idItem, item]) => `
-                    <tr>
-                      <td class="py-2 pr-2">
-                        <input type="text" value="${item.nome || ''}" onchange="atualizarItem('${idItem}', 'nome', this.value)" placeholder="Nome do item" class="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-200 font-medium" />
-                      </td>
-                      <td class="py-2 px-1 text-center">
-                        <select onchange="atualizarItem('${idItem}', 'categoria', this.value)" class="bg-zinc-950 border border-zinc-800 rounded px-1.5 py-1 text-zinc-300 w-full text-center">
-                          <option value="0" ${item.categoria == '0' ? 'selected' : ''}>0</option>
-                          <option value="I" ${item.categoria == 'I' ? 'selected' : ''}>I</option>
-                          <option value="II" ${item.categoria == 'II' ? 'selected' : ''}>II</option>
-                          <option value="III" ${item.categoria == 'III' ? 'selected' : ''}>III</option>
-                          <option value="IV" ${item.categoria == 'IV' ? 'selected' : ''}>IV</option>
-                        </select>
-                      </td>
-                      <td class="py-2 px-1 text-center">
-                        <input type="number" step="0.5" value="${item.espacos !== undefined ? item.espacos : 1}" onchange="atualizarItem('${idItem}', 'espacos', parseFloat(this.value) || 0)" class="w-full bg-zinc-950 border border-zinc-800 rounded px-1.5 py-1 text-center text-zinc-200" />
-                      </td>
-                      <td class="py-2 px-2">
-                        <input type="text" value="${item.detalhes || ''}" onchange="atualizarItem('${idItem}', 'detalhes', this.value)" placeholder="Dano, munição, efeitos..." class="w-full bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-zinc-400" />
-                      </td>
-                      <td class="py-2 text-center">
-                        <button onclick="removerItem('${idItem}')" class="text-red-500 hover:text-red-400 font-bold px-2 py-1">✕</button>
-                      </td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
+              return `
+                <div class="bg-zinc-950 border border-zinc-800/80 rounded p-2.5 flex items-center justify-between gap-2">
+                  <div class="w-1/3">
+                    <span class="text-xs font-semibold text-zinc-200 block truncate">${pericia.nome}</span>
+                    <span class="text-[10px] text-amber-500 font-mono">${pericia.attr} (${attrValor}d20)</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 w-2/3 justify-end">
+                    <select onchange="atualizarPericia('${pericia.nome}', 'grau', parseInt(this.value))" class="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-zinc-300">
+                      <option value="0" ${grauTreino === 0 ? 'selected' : ''}>Destr. (+0)</option>
+                      <option value="5" ${grauTreino === 5 ? 'selected' : ''}>Treinado (+5)</option>
+                      <option value="10" ${grauTreino === 10 ? 'selected' : ''}>Veterano (+10)</option>
+                      <option value="15" ${grauTreino === 15 ? 'selected' : ''}>Expert (+15)</option>
+                    </select>
+                    <input type="number" value="${bonusExtra}" placeholder="+0" onchange="atualizarPericia('${pericia.nome}', 'bonus', parseInt(this.value) || 0)" title="Bónus Adicional / Itens" class="w-10 bg-zinc-900 border border-zinc-700 rounded px-1 py-1 text-center text-xs text-zinc-300" />
+                    <span class="text-xs font-mono font-bold w-7 text-right ${totalBonus > 0 ? 'text-amber-400' : 'text-zinc-500'}">
+                      +${totalBonus}
+                    </span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- ABA 3: HISTÓRIA & DESCRIÇÃO -->
+        <div class="${abaAtiva === 'historia' ? 'block' : 'hidden'} bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
+          <h2 class="text-amber-500 font-bold border-b border-zinc-800 pb-1 text-sm uppercase">Descrição & Histórico do Agente</h2>
+          
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-zinc-400 font-semibold block mb-1">Aparência</label>
+              <textarea rows="3" onchange="atualizarCampo('aparencia', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300 focus:outline-none focus:border-amber-500" placeholder="Vestimenta, cicatrizes, traços marcantes...">${p.aparencia || ''}</textarea>
+            </div>
+            <div>
+              <label class="text-xs text-zinc-400 font-semibold block mb-1">Personalidade</label>
+              <textarea rows="3" onchange="atualizarCampo('personalidade', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300 focus:outline-none focus:border-amber-500" placeholder="Comportamento, manias, postura perante o paranormal...">${p.personalidade || ''}</textarea>
+            </div>
+            <div>
+              <label class="text-xs text-zinc-400 font-semibold block mb-1">Histórico</label>
+              <textarea rows="4" onchange="atualizarCampo('historico', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300 focus:outline-none focus:border-amber-500" placeholder="Origem, como foi recrutado pela Ordo Realitas...">${p.historico || ''}</textarea>
+            </div>
+            <div>
+              <label class="text-xs text-zinc-400 font-semibold block mb-1">Objetivo Pessoal</label>
+              <textarea rows="4" onchange="atualizarCampo('objetivo', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs text-zinc-300 focus:outline-none focus:border-amber-500" placeholder="Motivação para continuar lutando contra o Outro Lado...">${p.objetivo || ''}</textarea>
             </div>
           </div>
         </div>
@@ -268,6 +376,11 @@
     function atualizarAtributo(attr, valor) {
       if (!personagemIdAtual) return;
       db.ref(`mesas/${salaAtual}/${personagemIdAtual}/atributos/${attr}`).set(valor);
+    }
+
+    function atualizarPericia(nomePericia, campo, valor) {
+      if (!personagemIdAtual) return;
+      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/pericias/${nomePericia}/${campo}`).set(valor);
     }
 
     function adicionarItem() {
@@ -313,7 +426,11 @@
         peMax: 2,
         defesa: 11,
         atributos: { AGI: 2, FOR: 2, INT: 1, PRE: 1, VIG: 2 },
-        itens: itensIniciais
+        itens: itensIniciais,
+        aparencia: "",
+        personalidade: "",
+        historico: "",
+        objetivo: ""
       });
       personagemIdAtual = novoRef.key;
     }
