@@ -23,7 +23,6 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // SENHA DO MESTRE
     const SENHA_MESTRE_PADRAO = "ordem123";
 
     const LISTA_PERICIAS = [
@@ -221,16 +220,14 @@
       }
     }
 
-    // Upload de Documentos
+    // Documentos
     function fazerUploadDocumento(event) {
       const arquivo = event.target.files[0];
       if (!arquivo) return;
-
       if (arquivo.size > 2.5 * 1024 * 1024) {
         alert("O arquivo é muito grande. Escolha um arquivo de até 2.5MB.");
         return;
       }
-
       const leitor = new FileReader();
       leitor.onload = function(e) {
         const conteudoBase64 = e.target.result;
@@ -255,8 +252,7 @@
     // Rituais e Poderes
     function adicionarRitual() {
       if (!personagemIdAtual) return;
-      const ref = db.ref(`mesas/${salaAtual}/${personagemIdAtual}/rituals`).push();
-      ref.set({ nome: "Novo Ritual", elemento: "Conhecimento", circulo: "1º", pe: "1", efeito: "Descrição do efeito..." });
+      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/rituals`).push({ nome: "Novo Ritual", elemento: "Conhecimento", circulo: "1º", pe: "1", efeito: "Descrição..." });
     }
     function atualizarRitual(id, campo, valor) {
       if (!personagemIdAtual) return;
@@ -269,8 +265,7 @@
 
     function adicionarPoder() {
       if (!personagemIdAtual) return;
-      const ref = db.ref(`mesas/${salaAtual}/${personagemIdAtual}/powers`).push();
-      ref.set({ nome: "Novo Poder / Habilidade", desc: "Descrição..." });
+      db.ref(`mesas/${salaAtual}/${personagemIdAtual}/powers`).push({ nome: "Novo Poder", desc: "Descrição..." });
     }
     function atualizarPoder(id, campo, valor) {
       if (!personagemIdAtual) return;
@@ -324,20 +319,18 @@
 
         <!-- ABA RITUAIS & PODERES -->
         <div class="${abaAtiva === 'rituais' ? 'block' : 'hidden'} space-y-6">
-          <!-- Rituais -->
           <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
             <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
               <h2 class="text-amber-500 font-bold text-sm uppercase">Rituais Paranormais</h2>
               <button onclick="adicionarRitual()" class="bg-amber-600 hover:bg-amber-500 text-black text-xs font-semibold px-2.5 py-1 rounded transition">+ Novo Ritual</button>
             </div>
-
             <div class="space-y-3">
               ${rituaisArray.length === 0 ? `
-                <div class="text-center py-6 text-zinc-600 text-xs">Nenhum ritual registado para este agente.</div>
+                <div class="text-center py-6 text-zinc-600 text-xs">Nenhum ritual registado.</div>
               ` : rituaisArray.map(([idR, r]) => `
-                <div class="bg-zinc-950 border border-zinc-800 rounded p-3 space-y-2 relative">
+                <div class="bg-zinc-950 border border-zinc-800 rounded p-3 space-y-2">
                   <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                    <input type="text" value="${r.nome || ''}" onchange="atualizarRitual('${idR}', 'nome', this.value)" placeholder="Nome do Ritual" class="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-zinc-200 font-bold" />
+                    <input type="text" value="${r.nome || ''}" onchange="atualizarRitual('${idR}', 'nome', this.value)" placeholder="Nome" class="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-zinc-200 font-bold" />
                     <select onchange="atualizarRitual('${idR}', 'elemento', this.value)" class="bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-zinc-300">
                       <option value="Conhecimento" ${r.elemento === 'Conhecimento' ? 'selected' : ''}>Conhecimento</option>
                       <option value="Energia" ${r.elemento === 'Energia' ? 'selected' : ''}>Energia</option>
@@ -352,33 +345,31 @@
                       <option value="4º" ${r.circulo === '4º' ? 'selected' : ''}>4º Círculo</option>
                     </select>
                     <div class="flex items-center gap-2">
-                      <input type="text" value="${r.pe || ''}" onchange="atualizarRitual('${idR}', 'pe', this.value)" placeholder="Custo PE" class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-amber-400 font-mono text-center" />
-                      <button onclick="removerRitual('${idR}')" class="text-red-500 hover:text-red-400 font-bold px-2 py-1 text-xs">✕</button>
+                      <input type="text" value="${r.pe || ''}" onchange="atualizarRitual('${idR}', 'pe', this.value)" placeholder="PE" class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-amber-400 font-mono text-center" />
+                      <button onclick="removerRitual('${idR}')" class="text-red-500 font-bold px-2 py-1 text-xs">✕</button>
                     </div>
                   </div>
-                  <textarea rows="2" onchange="atualizarRitual('${idR}', 'efeito', this.value)" placeholder="Execução, alcance, alvo, duração e efeito..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-300 focus:outline-none focus:border-amber-500 font-mono">${r.efeito || ''}</textarea>
+                  <textarea rows="2" onchange="atualizarRitual('${idR}', 'efeito', this.value)" placeholder="Efeito..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-300 font-mono">${r.efeito || ''}</textarea>
                 </div>
               `).join('')}
             </div>
           </div>
 
-          <!-- Poderes e Habilidades -->
           <div class="bg-zinc-900 border border-zinc-800 rounded p-4 space-y-4">
             <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <h2 class="text-amber-500 font-bold text-sm uppercase">Poderes Paranormais & Habilidades de Classe</h2>
+              <h2 class="text-amber-500 font-bold text-sm uppercase">Poderes Paranormais & Habilidades</h2>
               <button onclick="adicionarPoder()" class="bg-amber-600 hover:bg-amber-500 text-black text-xs font-semibold px-2.5 py-1 rounded transition">+ Novo Poder</button>
             </div>
-
             <div class="space-y-3">
               ${poderesArray.length === 0 ? `
                 <div class="text-center py-6 text-zinc-600 text-xs">Nenhum poder registado.</div>
               ` : poderesArray.map(([idP, pod]) => `
                 <div class="bg-zinc-950 border border-zinc-800 rounded p-3 space-y-2">
                   <div class="flex items-center gap-2">
-                    <input type="text" value="${pod.nome || ''}" onchange="atualizarPoder('${idP}', 'nome', this.value)" placeholder="Nome do Poder ou Habilidade" class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-amber-300 font-bold" />
-                    <button onclick="removerPoder('${idP}')" class="text-red-500 hover:text-red-400 font-bold px-2 py-1 text-xs">✕</button>
+                    <input type="text" value="${pod.nome || ''}" onchange="atualizarPoder('${idP}', 'nome', this.value)" placeholder="Nome" class="w-full bg-zinc-900 border border-zinc-800 rounded px-2 py-1 text-xs text-amber-300 font-bold" />
+                    <button onclick="removerPoder('${idP}')" class="text-red-500 font-bold px-2 py-1 text-xs">✕</button>
                   </div>
-                  <textarea rows="2" onchange="atualizarPoder('${idP}', 'desc', this.value)" placeholder="Descrição e regras..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-400 focus:outline-none focus:border-amber-500">${pod.desc || ''}</textarea>
+                  <textarea rows="2" onchange="atualizarPoder('${idP}', 'desc', this.value)" placeholder="Descrição..." class="w-full bg-zinc-900 border border-zinc-800 rounded p-2 text-xs text-zinc-400">${pod.desc || ''}</textarea>
                 </div>
               `).join('')}
             </div>
@@ -398,7 +389,6 @@
                 <input type="file" onchange="fazerUploadDocumento(event)" class="hidden" accept="image/*,.pdf,.txt" />
               </label>
             </div>
-
             ${chavesDocumentos.length === 0 ? `
               <div class="text-center py-12 text-zinc-600 text-sm">Nenhum documento arquivado.</div>
             ` : `
@@ -552,6 +542,10 @@
               <div>
                 <label class="text-xs text-zinc-500">Nome do Agente</label>
                 <input type="text" value="${p.nome || ''}" onchange="atualizarCampo('nome', this.value)" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
+              </div>
+              <div>
+                <label class="text-xs text-zinc-500">Origem</label>
+                <input type="text" value="${p.origem || ''}" onchange="atualizarCampo('origem', this.value)" placeholder="Ex: Acadêmico, Investigador..." class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-zinc-100" />
               </div>
               <div class="grid grid-cols-2 gap-2">
                 <div>
@@ -817,6 +811,7 @@
       const novoRef = db.ref(`mesas/${salaAtual}`).push();
       novoRef.set({
         nome: nomePadrao,
+        origem: "Acadêmico",
         classe: "Ocultista",
         nex: "5%",
         patente: "Recruta",
@@ -829,14 +824,10 @@
         peMax: 6,
         defesa: 10,
         atributos: { AGI: 1, FOR: 1, INT: 3, PRE: 2, VIG: 1 },
-        rituals: {
-          ritual_1: { nome: "Espirais da Perdição", elemento: "Morte", circulo: "1º", pe: "1", efeito: "Alcance curto, Alvo 1 ser, Resistência Vontade parcial." }
-        },
-        powers: {
-          power_1: { nome: "Técnica Ocultista", desc: "Você recebe +2 em testes de Ocultismo." }
-        },
+        rituals: { ritual_1: { nome: "Espirais da Perdição", elemento: "Morte", circulo: "1º", pe: "1", efeito: "Alcance curto." } },
+        powers: { power_1: { nome: "Técnica Ocultista", desc: "+2 em Ocultismo." } },
         armas: { arma_1: { nome: "Adaga", teste: "Luta", dano: "1d4", critico: "19/x2", alcance: "Corpo a corpo", especial: "Leve" } },
-        itens: { item_1: { nome: "Componentes Ritualísticos", categoria: "I", espacos: 1, detalhes: "Essencial para rituais" } },
+        itens: { item_1: { nome: "Componentes Ritualísticos", categoria: "I", espacos: 1, detalhes: "Essencial" } },
         aparencia: "", personalidade: "", historico: "", objetivo: ""
       });
       personagemIdAtual = novoRef.key;
