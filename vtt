@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VTT Tático — Iluminação Dinâmica & Lanternas</title>
+  <style>
+    :root {
+      --bg: #0b0d12;
+      --panel: #141821;
+      --panel-border: #252c3d;
+      --text: #e6e9f0;
+      --muted: #8b95a8;
+      --accent: #10b981;
+      --accent-hover: #059669;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* Barra Superior */
+    header {
+      height: 54px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--panel-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      gap: 10px;
+      z-index: 20;
+    }
+
+    .brand {
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: 0.5px;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    button, .file-btn {
+      background: #1c2230;
+      color: var(--text);
+      border: 1px solid var(--panel-border);
+      padding: 6px 11px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: 0.15s;
+      white-space: nowrap;
+    }
+
+    button:hover, .file-btn:hover {
+      background: #262f42;
+      border-color: #3a4661;
+    }
+
+    button.active {
+      background: var(--accent);
+      color: #062118;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    button.danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: var(--danger);
+      color: #fca5a5;
+    }
+
+    input[type="file"] { display: none; }
+
+    /* Área Principal */
+    .workspace {
+      flex: 1;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    canvas.drawing { cursor: crosshair; }
+    canvas.grabbing { cursor: grabbing; }
+
+    /* Painel Lateral Direito */
+    aside {
+      width: 295px;
+      background: var(--panel);
+      border-left: 1px solid var(--panel-border);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      overflow-y: auto;
+      z-index: 15;
+    }
+
+    .section {
+      background: #10131a;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+
+    .section h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 6px;
+    }
+
+    .control-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12.5px;
+    }
+
+    .control-row label {
+      display: flex;
+      justify-content: space-between;
+      color: #cbd5e1;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    input[type="text"], input[type="number"], select {
+      background: #181d29;
+      border: 1px solid var(--panel-border);
+      color: var(--text);
+      padding: 6px 8px;
+      border-radius: 5px;
+      font-size: 12.5px;
+      width: 100%;
+    }
+
+    input[type="color"] {
+      background: none;
+      border: 1px solid var(--panel-border);
+      height: 28px;
+      width: 100%;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .row-inline {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+
+    .checkbox-row input { accent-color: var(--accent); width: 15px; height: 15px; }
+
+    .hint {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      background: rgba(20, 24, 33, 0.9);
+      border: 1px solid var(--panel-border);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .badge-gm {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.4);
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">🔦 VTT Tático</div>
+
+  <div class="toolbar">
+    <button id="tool-select" class="active" onclick="setTool('select')">🖱️ Mover / Selecionar</button>
+    <button id="tool-wall" onclick="setTool('wall')">🧱 Desenhar Parede</button>
+    <button id="tool-door" onclick="setTool('door')">🚪 Adicionar Porta</button>
+    <button id="tool-light" onclick="setTool('light')">🕯️ Ponto de Luz</button>
+    <button id="tool-erase" class="danger" onclick="setTool('erase')">🗑️ Apagar Parede/Luz</button>
+  </div>
+
+  <div class="toolbar">
+    <label class="file-btn">
+      🗺️ Mapa
+      <input type="file" id="upload-map" accept="image/*" />
+    </label>
+    <button onclick="openModalToken('character')">🧙 + Personagem</button>
+    <button onclick="openModalToken('object')">📦 + Objeto</button>
+    <button onclick="exportScene()">💾 Salvar</button>
+    <label class="file-btn">
+      📂 Carregar
+      <input type="file" id="import-scene" accept=".json" />
+    </label>
+  </div>
+</header>
+
+<div class="workspace">
+  <canvas id="vttCanvas"></canvas>
+
+  <div class="hint" id="hint-text">
+    Arraste tokens • Roda do mouse: Zoom • Botão direito/Espaço + arrastar: Mover câmera • Teclas Q/E: Girar lanterna
+  </div>
+
+  <aside>
+    <!-- Ambiente & Escuridão -->
+    <div class="section">
+      <h3>🌑 Ambiente & Visão</h3>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="gm-mode" checked onchange="render()" />
+        <span><strong>Modo Mestre</strong> (ver paredes e penumbra)</span>
+      </label>
+
+      <div class="control-row">
+        <label><span>Escuridão do Ambiente</span> <span id="darkness-val">92%</span></label>
+        <input type="range" id="darkness-slider" min="0" max="1" step="0.02" value="0.92" oninput="updateEnv()" />
+      </div>
+
+      <label class="checkbox-row">
+        <input type="checkbox" id="grid-toggle" checked onchange="render()" />
+        <span>Mostrar Grade (Grid)</span>
+      </label>
+
+      <div class="control-row">
+        <label><span>Tamanho do Grid (px)</span> <span id="grid-val">50px</span></label>
+        <input type="range" id="grid-size" min="20" max="140" step="5" value="50" oninput="updateEnv()" />
+      </div>
+    </div>
+
+    <!-- Adicionar Novo Personagem / Objeto -->
+    <div class="section" id="creator-panel" style="display:none;">
+      <h3 id="creator-title">Adicionar Personagem</h3>
+      <div class="control-row">
+        <label>Nome</label>
+        <input type="text" id="new-name" placeholder="Ex: Agente Gabriel" />
+      </div>
+      <div class="row-inline">
+        <div class="control-row" style="flex:1;">
+          <label>Cor</label>
+          <input type="color" id="new-color" value="#10b981" />
+        </div>
+        <div class="control-row" style="flex:1;">
+          <label>Tamanho (grid)</label>
+          <input type="number" id="new-scale" value="1" min="0.5" max="6" step="0.5" />
+        </div>
+      </div>
+      <div class="control-row">
+        <label class="file-btn" style="justify-content:center;">
+          🖼️ Escolher Imagem (Opcional)
+          <input type="file" id="new-img" accept="image/*" />
+        </label>
+        <span id="new-img-name" style="font-size:11px; color:var(--muted);">Nenhuma imagem selecionada</span>
+      </div>
+      <div class="row-inline">
+        <button style="flex:1; background:var(--accent); color:#042f2e; font-weight:600;" onclick="confirmAddToken()">Adicionar</button>
+        <button onclick="closeCreator()">Cancelar</button>
+      </div>
+    </div>
+
+    <!-- Propriedades do Item Selecionado -->
+    <div class="section" id="inspector-panel">
+      <h3>🔦 Propriedades do Selecionado</h3>
+      <div id="no-selection" style="font-size:12px; color:var(--muted);">
+        Clique em um personagem, objeto, porta ou luz no mapa para configurar.
+      </div>
+
+      <div id="selection-controls" style="display:none; flex-direction:column; gap:9px;">
+        <div class="control-row">
+          <label>Nome</label>
+          <input type="text" id="sel-name" oninput="updateSelected()" />
+        </div>
+
+        <div class="control-row">
+          <label><span>Escala / Tamanho</span> <span id="sel-scale-val">1x</span></label>
+          <input type="range" id="sel-scale" min="0.5" max="5" step="0.25" oninput="updateSelected()" />
+        </div>
+
+        <!-- Controles de Lanterna e Visão (para Personagens) -->
+        <div id="token-light-box" style="display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--panel-border); padding-top:8px;">
+          <label class="checkbox-row">
+            <input type="checkbox" id="sel-flashlight" onchange="updateSelected()" />
+            <span>🔦 <strong>Lanterna Ligada</strong></span>
+          </label>
+
+          <label class="checkbox-row">
+            <input type="checkbox" id="sel-follow-mouse" onchange="updateSelected()" />
+            <span>Mirar lanterna no cursor do mouse</span>
+          </label>
+
+          <div class="control-row">
+            <label><span>Direção da Lanterna</span> <span id="sel-angle-val">0°</span></label>
+            <input type="range" id="sel-angle" min="0" max="360" step="1" oninput="updateSelected()" />
+          </div>
+
+          <div class="control-row">
+            <label><span>Alcance da Lanterna</span> <span id="sel-dist-val">320px</span></label>
+            <input type="range" id="sel-dist" min="80" max="900" step="10" oninput="updateSelected()" />
+          </div>
+
+          <div class="control-row">
+            <label><span>Abertura do Feixe</span> <span id="sel-cone-val">55°</span></label>
+            <input type="range" id="sel-cone" min="15" max="140" step="5" oninput="updateSelected()" />
+          </div>
+
+          <div class="control-row">
+            <label><span>Visão Próxima (360°)</span> <span id="sel-aura-val">65px</span></label>
+            <input type="range" id="sel-aura" min="0" max="300" step="5" oninput="updateSelected()" />
+          </div>
+
+          <div class="control-row">
+            <label>Cor da Luz</label>
+            <input type="color" id="sel-light-color" value="#fff4d6" oninput="updateSelected()" />
+          </div>
+        </div>
+
+        <button class="danger" onclick="deleteSelected()">🗑️ Remover Selecionado</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>💡 Dicas Rápidas</h3>
+      <ul style="font-size:11.5px; color:var(--muted); padding-left:16px; display:flex; flex-direction:column; gap:5px;">
+        <li><strong>Paredes:</strong> Clique para marcar pontos e aperte <b>ESC</b> ou <b>Botão Direito</b> para encerrar a parede.</li>
+        <li><strong>Portas:</strong> Clique em uma porta com a ferramenta <em>Mover</em> para abrir ou fechar (portas abertas deixam a luz passar).</li>
+        <li><strong>Girar Lanterna:</strong> Selecione o agente e use as teclas <b>Q</b> e <b>E</b> ou ative a mira pelo mouse.</li>
+      </ul>
+    </div>
+  </aside>
+</div>
+
+<script>
+  const canvas = document.getElementById('vttCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // Canvas auxiliar para calcular a camada de escuridão e iluminação
+  const darkCanvas = document.createElement('canvas');
+  const darkCtx = darkCanvas.getContext('2d');
+
+  // Estado da Cena
+  let state = {
+    mapDataUrl: null,
+    mapWidth: 1400,
+    mapHeight: 1000,
+    gridSize: 50,
+    darkness: 0.92,
+    tokens: [], // { id, type: 'character'|'object', name, x, y, scale, color, imgData, flashlight, angle, dist, cone, aura, lightColor, followMouse }
+    walls: [],  // { id, x1, y1, x2, y2, isDoor, open }
+    lights: []  // { id, name, x, y, radius, color }
+  };
+
+  let mapImage = null;
+  const imageCache = {};
+
+  // Câmera e Interação
+  let camera = { x: 80, y: 40, zoom: 0.85 };
+  let currentTool = 'select';
+  let selectedItem = null; // { kind: 'token'|'light'|'wall', id }
+  let dragging = false;
+  let panning = false;
+  let spacePressed = false;
+  let dragOffset = { x: 0, y: 0 };
+  let panStart = { x: 0, y: 0 };
+  let wallDraftStart = null;
+  let mouseWorld = { x: 0, y: 0 };
+  let pendingTokenType = 'character';
+  let pendingImgData = null;
+
+  function resize() {
+    canvas.width = canvas.parentElement.clientWidth - 295;
+    canvas.height = canvas.parentElement.clientHeight;
+    darkCanvas.width = canvas.width;
+    darkCanvas.height = canvas.height;
+    render();
+  }
+  window.addEventListener('resize', resize);
+
+  // Inicializa com um exemplo rápido para teste imediato
+  function initDemoScene() {
+    state.tokens.push({
+      id: 't1',
+      type: 'character',
+      name: 'Agente',
+      x: 350,
+      y: 350,
+      scale: 1,
+      color: '#10b981',
+      imgData: null,
+      flashlight: true,
+      angle: 0,
+      dist: 360,
+      cone: 55,
+      aura: 70,
+      lightColor: '#fff5d6',
+      followMouse: false
+    });
+
+    // Sala de exemplo com uma porta no meio
+    state.walls.push(
+      { id: 'w1', x1: 200, y1: 200, x2: 550, y2: 200, isDoor: false, open: false },
+      { id: 'w2', x1: 550, y1: 200, x2: 550, y2: 310, isDoor: false, open: false },
+      { id: 'd1', x1: 550, y1: 310, x2: 550, y2: 390, isDoor: true, open: false },
+      { id: 'w3', x1: 550, y1: 390, x2: 550, y2: 520, isDoor: false, open: false },
+      { id: 'w4', x1: 550, y1: 520, x2: 200, y2: 520, isDoor: false, open: false },
+      { id: 'w5', x1: 200, y1: 520, x2: 200, y2: 200, isDoor: false, open: false }
+    );
+
+    selectItem('token', 't1');
+  }
+
+  // Ferramentas
+  function setTool(tool) {
+    currentTool = tool;
+    wallDraftStart = null;
+    document.querySelectorAll('header button[id^="tool-"]').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('tool-' + tool);
+    if (btn) btn.classList.add('active');
+    canvas.className = (tool === 'wall' || tool === 'door' || tool === 'light') ? 'drawing' : '';
+    render();
+  }
+
+  function updateEnv() {
+    state.darkness = parseFloat(document.getElementById('darkness-slider').value);
+    state.gridSize = parseInt(document.getElementById('grid-size').value, 10);
+    document.getElementById('darkness-val').textContent = Math.round(state.darkness * 100) + '%';
+    document.getElementById('grid-val').textContent = state.gridSize + 'px';
+    render();
+  }
+
+  // Upload de Mapa
+  document.getElementById('upload-map').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      loadMapFromDataUrl(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function loadMapFromDataUrl(dataUrl) {
+    state.mapDataUrl = dataUrl;
+    const img = new Image();
+    img.onload = () => {
+      mapImage = img;
+      state.mapWidth = img.width;
+      state.mapHeight = img.height;
+      // Centraliza o mapa
+      camera.zoom = Math.min((canvas.width - 60) / img.width, (canvas.height - 60) / img.height, 1);
+      camera.x = (canvas.width - img.width * camera.zoom) / 2;
+      camera.y = (canvas.height - img.height * camera.zoom) / 2;
+      render();
+    };
+    img.src = dataUrl;
+  }
+
+  // Criador de Tokens / Objetos
+  function openModalToken(type) {
+    pendingTokenType = type;
+    pendingImgData = null;
+    document.getElementById('creator-panel').style.display = 'flex';
+    document.getElementById('creator-title').textContent = type === 'character' ? '🧙 Novo Personagem' : '📦 Novo Objeto';
+    document.getElementById('new-name').value = type === 'character' ? 'Investigador' : 'Pista / Objeto';
+    document.getElementById('new-color').value = type === 'character' ? '#10b981' : '#f59e0b';
+    document.getElementById('new-img-name').textContent = 'Nenhuma imagem selecionada';
+  }
+
+  function closeCreator() {
+    document.getElementById('creator-panel').style.display = 'none';
+  }
+
+  document.getElementById('new-img').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('new-img-name').textContent = file.name;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      pendingImgData = ev.target.result;
+      const img = new Image();
+      img.src = pendingImgData;
+      imageCache[pendingImgData] = img;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function confirmAddToken() {
+    const center = screenToWorld(canvas.width / 2, canvas.height / 2);
+    const id = 'tok_' + Date.now();
+    const isChar = pendingTokenType === 'character';
+    const token = {
+      id,
+      type: pendingTokenType,
+      name: document.getElementById('new-name').value || (isChar ? 'Agente' : 'Objeto'),
+      x: center.x,
+      y: center.y,
+      scale: parseFloat(document.getElementById('new-scale').value) || 1,
+      color: document.getElementById('new-color').value,
+      imgData: pendingImgData,
+      flashlight: isChar,
+      angle: 0,
+      dist: 350,
+      cone: 55,
+      aura: isChar ? 65 : 0,
+      lightColor: '#fff5d6',
+      followMouse: false
+    };
+    state.tokens.push(token);
+    closeCreator();
+    selectItem('token', id);
+    render();
+  }
+
+  // Seleção e Inspetor
+  function selectItem(kind, id) {
+    selectedItem = { kind, id };
+    const panel = document.getElementById('selection-controls');
+    const empty = document.getElementById('no-selection');
+    const lightBox = document.getElementById('token-light-box');
+
+    if (!kind) {
+      selectedItem = null;
+      panel.style.display = 'none';
+      empty.style.display = 'block';
+      return;
+    }
+
+    empty.style.display = 'none';
+    panel.style.display = 'flex';
+
+    if (kind === 'token') {
+      const t = state.tokens.find(x => x.id === id);
+      if (!t) return selectItem(null);
+      document.getElementById('sel-name').value = t.name;
+      document.getElementById('sel-scale').value = t.scale;
+      document.getElementById('sel-scale-val').textContent = t.scale + 'x';
+
+      if (t.type === 'character') {
+        lightBox.style.display = 'flex';
+        document.getElementById('sel-flashlight').checked = t.flashlight;
+        document.getElementById('sel-follow-mouse').checked = t.followMouse;
+        document.getElementById('sel-angle').value = Math.round(t.angle);
+        document.getElementById('sel-angle-val').textContent = Math.round(t.angle) + '°';
+        document.getElementById('sel-dist').value = t.dist;
+        document.getElementById('sel-dist-val').textContent = t.dist + 'px';
+        document.getElementById('sel-cone').value = t.cone;
+        document.getElementById('sel-cone-val').textContent = t.cone + '°';
+        document.getElementById('sel-aura').value = t.aura;
+        document.getElementById('sel-aura-val').textContent = t.aura + 'px';
+        document.getElementById('sel-light-color').value = t.lightColor;
+      } else {
+        lightBox.style.display = 'none';
+      }
+    } else if (kind === 'light') {
+      const l = state.lights.find(x => x.id === id);
+      if (!l) return selectItem(null);
+      document.getElementById('sel-name').value = l.name;
+      document.getElementById('sel-scale').value = l.radius / 100;
+      document.getElementById('sel-scale-val').textContent = l.radius + 'px';
+      lightBox.style.display = 'none';
+    }
+  }
+
+  function updateSelected() {
+    if (!selectedItem) return;
+    if (selectedItem.kind === 'token') {
+      const t = state.tokens.find(x => x.id === selectedItem.id);
+      if (!t) return;
+      t.name = document.getElementById('sel-name').value;
+      t.scale = parseFloat(document.getElementById('sel-scale').value);
+      document.getElementById('sel-scale-val').textContent = t.scale + 'x';
+
+      if (t.type === 'character') {
+        t.flashlight = document.getElementById('sel-flashlight').checked;
+        t.followMouse = document.getElementById('sel-follow-mouse').checked;
+        t.angle = parseFloat(document.getElementById('sel-angle').value);
+        t.dist = parseFloat(document.getElementById('sel-dist').value);
+        t.cone = parseFloat(document.getElementById('sel-cone').value);
+        t.aura = parseFloat(document.getElementById('sel-aura').value);
+        t.lightColor = document.getElementById('sel-light-color').value;
+
+        document.getElementById('sel-angle-val').textContent = Math.round(t.angle) + '°';
+        document.getElementById('sel-dist-val').textContent = t.dist + 'px';
+        document.getElementById('sel-cone-val').textContent = t.cone + '°';
+        document.getElementById('sel-aura-val').textContent = t.aura + 'px';
+      }
+    } else if (selectedItem.kind === 'light') {
+      const l = state.lights.find(x => x.id === selectedItem.id);
+      if (!l) return;
+      l.name = document.getElementById('sel-name').value;
+      l.radius = parseFloat(document.getElementById('sel-scale').value) * 100;
+      document.getElementById('sel-scale-val').textContent = Math.round(l.radius) + 'px';
+    }
+    render();
+  }
+
+  function deleteSelected() {
+    if (!selectedItem) return;
+    if (selectedItem.kind === 'token') {
+      state.tokens = state.tokens.filter(x => x.id !== selectedItem.id);
+    } else if (selectedItem.kind === 'light') {
+      state.lights = state.lights.filter(x => x.id !== selectedItem.id);
+    }
+    selectItem(null);
+    render();
+  }
+
+  // Coordenadas
+  function screenToWorld(sx, sy) {
+    return {
+      x: (sx - camera.x) / camera.zoom,
+      y: (sy - camera.y) / camera.zoom
+    };
+  }
+
+  function distToSegment(px, py, x1, y1, x2, y2) {
+    const l2 = (x2 - x1) ** 2 + (y2 - y1) ** 2;
+    if (l2 === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+  }
+
+  // Eventos do Mouse e Teclado
+  canvas.addEventListener('mousedown', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const world = screenToWorld(sx, sy);
+
+    // Pan com botão direito, botão do meio ou Espaço
+    if (e.button === 1 || e.button === 2 || spacePressed) {
+      if (e.button === 2 && wallDraftStart) {
+        wallDraftStart = null;
+        render();
+        return;
+      }
+      panning = true;
+      panStart = { x: sx - camera.x, y: sy - camera.y };
+      canvas.classList.add('grabbing');
+      return;
+    }
+
+    if (currentTool === 'wall' || currentTool === 'door') {
+      // Snap leve ao grid se Shift não estiver pressionado
+      const snap = !e.shiftKey ? state.gridSize / 2 : 1;
+      const wx = Math.round(world.x / snap) * snap;
+      const wy = Math.round(world.y / snap) * snap;
+
+      if (!wallDraftStart) {
+        wallDraftStart = { x: wx, y: wy };
+      } else {
+        if (Math.hypot(wx - wallDraftStart.x, wy - wallDraftStart.y) > 5) {
+          state.walls.push({
+            id: 'w_' + Date.now(),
+            x1: wallDraftStart.x,
+            y1: wallDraftStart.y,
+            x2: wx,
+            y2: wy,
+            isDoor: currentTool === 'door',
+            open: false
+          });
+        }
+        wallDraftStart = currentTool === 'wall' ? { x: wx, y: wy } : null;
+      }
+      render();
+      return;
+    }
+
+    if (currentTool === 'light') {
+      const id = 'l_' + Date.now();
+      state.lights.push({
+        id,
+        name: 'Tocha / Lampião',
+        x: world.x,
+        y: world.y,
+        radius: 260,
+        color: '#ffb74d'
+      });
+      selectItem('light', id);
+      setTool('select');
+      render();
+      return;
+    }
+
+    if (currentTool === 'erase') {
+      // Apaga parede/porta próxima
+      const wallIdx = state.walls.findIndex(w => distToSegment(world.x, world.y, w.x1, w.y1, w.x2, w.y2) < 12 / camera.zoom);
+      if (wallIdx !== -1) {
+        state.walls.splice(wallIdx, 1);
+        render();
+        return;
+      }
+      // Apaga luz próxima
+      const lightIdx = state.lights.findIndex(l => Math.hypot(world.x - l.x, world.y - l.y) < 18 / camera.zoom);
+      if (lightIdx !== -1) {
+        state.lights.splice(lightIdx, 1);
+        render();
+        return;
+      }
+      return;
+    }
+
+    if (currentTool === 'select') {
+      // 1. Verifica clique em Token (de cima para baixo)
+      for (let i = state.tokens.length - 1; i >= 0; i--) {
+        const t = state.tokens[i];
+        const r = (state.gridSize * t.scale) / 2;
+        if (Math.hypot(world.x - t.x, world.y - t.y) <= r) {
+          selectItem('token', t.id);
+          dragging = true;
+          dragOffset = { x: world.x - t.x, y: world.y - t.y };
+          render();
+          return;
+        }
+      }
+
+      // 2. Verifica clique em Ponto de Luz
+      for (let i = state.lights.length - 1; i >= 0; i--) {
+        const l = state.lights[i];
+        if (Math.hypot(world.x - l.x, world.y - l.y) <= 16 / camera.zoom) {
+          selectItem('light', l.id);
+          dragging = true;
+          dragOffset = { x: world.x - l.x, y: world.y - l.y };
+          render();
+          return;
+        }
+      }
+
+      // 3. Verifica clique em Porta para abrir/fechar
+      for (const w of state.walls) {
+        if (w.isDoor && distToSegment(world.x, world.y, w.x1, w.y1, w.x2, w.y2) < 12 / camera.zoom) {
+          w.open = !w.open;
+          render();
+          return;
+        }
+      }
+
+      selectItem(null);
+      render();
+    }
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    mouseWorld = screenToWorld(sx, sy);
+
+    if (panning) {
+      camera.x = sx - panStart.x;
+      camera.y = sy - panStart.y;
+      render();
+      return;
+    }
+
+    if (dragging && selectedItem) {
+      if (selectedItem.kind === 'token') {
+        const t = state.tokens.find(x => x.id === selectedItem.id);
+        if (t) {
+          t.x = mouseWorld.x - dragOffset.x;
+          t.y = mouseWorld.y - dragOffset.y;
+        }
+      } else if (selectedItem.kind === 'light') {
+        const l = state.lights.find(x => x.id === selectedItem.id);
+        if (l) {
+          l.x = mouseWorld.x - dragOffset.x;
+          l.y = mouseWorld.y - dragOffset.y;
+        }
+      }
+      render();
+      return;
+    }
+
+    // Mira dinâmica da lanterna no cursor do mouse
+    let needsRender = !!wallDraftStart;
+    for (const t of state.tokens) {
+      if (t.type === 'character' && t.flashlight && t.followMouse) {
+        const rad = Math.atan2(mouseWorld.y - t.y, mouseWorld.x - t.x);
+        t.angle = ((rad * 180 / Math.PI) + 360) % 360;
+        if (selectedItem && selectedItem.id === t.id) {
+          document.getElementById('sel-angle').value = Math.round(t.angle);
+          document.getElementById('sel-angle-val').textContent = Math.round(t.angle) + '°';
+        }
+        needsRender = true;
+      }
+    }
+    if (needsRender) render();
+  });
+
+  window.addEventListener('mouseup', () => {
+    dragging = false;
+    panning = false;
+    canvas.classList.remove('grabbing');
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
+    const before = screenToWorld(sx, sy);
+
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    camera.zoom = Math.max(0.2, Math.min(4, camera.zoom * factor));
+
+    camera.x = sx - before.x * camera.zoom;
+    camera.y = sy - before.y * camera.zoom;
+    render();
+  }, { passive: false });
+
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') spacePressed = true;
+    if (e.key === 'Escape') {
+      wallDraftStart = null;
+      setTool('select');
+    }
+    if ((e.key === 'q' || e.key === 'Q' || e.key === 'e' || e.key === 'E') && selectedItem?.kind === 'token') {
+      const t = state.tokens.find(x => x.id === selectedItem.id);
+      if (t && t.type === 'character') {
+        const delta = (e.key === 'q' || e.key === 'Q') ? -10 : 10;
+        t.angle = (t.angle + delta + 360) % 360;
+        document.getElementById('sel-angle').value = Math.round(t.angle);
+        document.getElementById('sel-angle-val').textContent = Math.round(t.angle) + '°';
+        render();
+      }
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    if (e.code === 'Space') spacePressed = false;
+  });
+
+  // =========================================================================
+  // MOTOR DE RAYCASTING 2D (BLOQUEIO DE LUZ PELAS PAREDES)
+  // =========================================================================
+  function getBlockingSegments() {
+    const segs = [];
+    for (const w of state.walls) {
+      if (w.isDoor && w.open) continue; // Porta aberta não bloqueia luz
+      segs.push({ x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2 });
+    }
+    // Bordas do mundo para evitar raios infinitos
+    const pad = 3000;
+    segs.push(
+      { x1: -pad, y1: -pad, x2: state.mapWidth + pad, y2: -pad },
+      { x1: state.mapWidth + pad, y1: -pad, x2: state.mapWidth + pad, y2: state.mapHeight + pad },
+      { x1: state.mapWidth + pad, y1: state.mapHeight + pad, x2: -pad, y2: state.mapHeight + pad },
+      { x1: -pad, y1: state.mapHeight + pad, x2: -pad, y2: -pad }
+    );
+    return segs;
+  }
+
+  function intersectRaySegment(rx, ry, rdx, rdy, seg) {
+    const sdx = seg.x2 - seg.x1;
+    const sdy = seg.y2 - seg.y1;
+    const denom = rdx * sdy - rdy * sdx;
+    if (Math.abs(denom) < 1e-8) return null;
+
+    const t2 = (rdx * (seg.y1 - ry) + rdy * (rx - seg.x1)) / denom;
+    if (t2 < 0 || t2 > 1) return null;
+
+    const t1 = Math.abs(rdx) > Math.abs(rdy)
+      ? (seg.x1 + sdx * t2 - rx) / rdx
+      : (seg.y1 + sdy * t2 - ry) / rdy;
+
+    if (t1 < 0) return null;
+    return { x: rx + rdx * t1, y: ry + rdy * t1, dist: t1 };
+  }
+
+  function computeVisibilityPolygon(ox, oy, segments) {
+    const angles = [];
+    for (const s of segments) {
+      const a1 = Math.atan2(s.y1 - oy, s.x1 - ox);
+      const a2 = Math.atan2(s.y2 - oy, s.x2 - ox);
+      angles.push(a1 - 0.00015, a1, a1 + 0.00015);
+      angles.push(a2 - 0.00015, a2, a2 + 0.00015);
+    }
+
+    const points = [];
+    for (const angle of angles) {
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      let closest = null;
+      for (const s of segments) {
+        const hit = intersectRaySegment(ox, oy, dx, dy, s);
+        if (hit && (!closest || hit.dist < closest.dist)) {
+          closest = hit;
+        }
+      }
+      if (closest) {
+        points.push({ x: closest.x, y: closest.y, angle });
+      }
+    }
+
+    points.sort((a, b) => a.angle - b.angle);
+    return points;
+  }
+
+  function drawLightSource(ox, oy, radius, color, isCone, dirDeg, coneDeg, segments) {
+    const poly = computeVisibilityPolygon(ox, oy, segments);
+    if (poly.length < 3) return;
+
+    darkCtx.save();
+    // Aplica a transformação da câmera no canvas de escuridão
+    darkCtx.translate(camera.x, camera.y);
+    darkCtx.scale(camera.zoom, camera.zoom);
+
+    // Recorta pelo polígono de visibilidade (onde as paredes bloqueiam)
+    darkCtx.beginPath();
+    darkCtx.moveTo(poly[0].x, poly[0].y);
+    for (let i = 1; i < poly.length; i++) {
+      darkCtx.lineTo(poly[i].x, poly[i].y);
+    }
+    darkCtx.closePath();
+    darkCtx.clip();
+
+    // Se for lanterna direcional, recorta também pelo cone
+    if (isCone) {
+      const dirRad = (dirDeg * Math.PI) / 180;
+      const halfCone = ((coneDeg / 2) * Math.PI) / 180;
+      darkCtx.beginPath();
+      darkCtx.moveTo(ox, oy);
+      darkCtx.arc(ox, oy, radius, dirRad - halfCone, dirRad + halfCone);
+      darkCtx.closePath();
+      darkCtx.clip();
+    }
+
+    // "Fura" a escuridão suavemente
+    darkCtx.globalCompositeOperation = 'destination-out';
+    const grad = darkCtx.createRadialGradient(ox, oy, radius * 0.08, ox, oy, radius);
+    grad.addColorStop(0, 'rgba(0, 0, 0, 1)');
+    grad.addColorStop(0.7, 'rgba(0, 0, 0, 0.88)');
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    darkCtx.fillStyle = grad;
+    darkCtx.beginPath();
+    darkCtx.arc(ox, oy, radius, 0, Math.PI * 2);
+    darkCtx.fill();
+
+    // Adiciona leve tonalidade quente/fria da luz
+    darkCtx.globalCompositeOperation = 'source-atop';
+    darkCtx.fillStyle = color;
+    darkCtx.globalAlpha = 0.14;
+    darkCtx.beginPath();
+    darkCtx.arc(ox, oy, radius, 0, Math.PI * 2);
+    darkCtx.fill();
+
+    darkCtx.restore();
+  }
+
+  // =========================================================================
+  // RENDERIZAÇÃO PRINCIPAL
+  // =========================================================================
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(camera.x, camera.y);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    // 1. Fundo / Mapa
+    if (mapImage) {
+      ctx.drawImage(mapImage, 0, 0, state.mapWidth, state.mapHeight);
+    } else {
+      ctx.fillStyle = '#181d27';
+      ctx.fillRect(0, 0, state.mapWidth, state.mapHeight);
+      ctx.strokeStyle = '#2a3242';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(0, 0, state.mapWidth, state.mapHeight);
+    }
+
+    // 2. Grade (Grid)
+    if (document.getElementById('grid-toggle').checked) {
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.09)';
+      ctx.lineWidth = 1 / camera.zoom;
+      const g = state.gridSize;
+      for (let x = 0; x <= state.mapWidth; x += g) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, state.mapHeight);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= state.mapHeight; y += g) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(state.mapWidth, y);
+        ctx.stroke();
+      }
+    }
+
+    // 3. Objetos (Props) abaixo dos personagens
+    for (const t of state.tokens.filter(x => x.type === 'object')) {
+      drawToken(t);
+    }
+
+    // 4. Personagens
+    for (const t of state.tokens.filter(x => x.type === 'character')) {
+      drawToken(t);
+    }
+
+    ctx.restore();
+
+    // 5. Camada de Escuridão + Lanternas + Luzes
+    const isGM = document.getElementById('gm-mode').checked;
+    const effectiveDarkness = isGM ? state.darkness * 0.62 : state.darkness;
+
+    if (effectiveDarkness > 0.01) {
+      darkCtx.clearRect(0, 0, darkCanvas.width, darkCanvas.height);
+      darkCtx.globalCompositeOperation = 'source-over';
+      darkCtx.fillStyle = `rgba(4, 6, 11, ${effectiveDarkness})`;
+      darkCtx.fillRect(0, 0, darkCanvas.width, darkCanvas.height);
+
+      const segments = getBlockingSegments();
+
+      // Luzes fixas do cenário
+      for (const l of state.lights) {
+        drawLightSource(l.x, l.y, l.radius, l.color, false, 0, 0, segments);
+      }
+
+      // Visão próxima e lanternas dos personagens
+      for (const t of state.tokens) {
+        if (t.type !== 'character') continue;
+        if (t.aura > 0) {
+          drawLightSource(t.x, t.y, t.aura, t.lightColor, false, 0, 0, segments);
+        }
+        if (t.flashlight && t.dist > 0) {
+          drawLightSource(t.x, t.y, t.dist, t.lightColor, true, t.angle, t.cone, segments);
+        }
+      }
+
+      ctx.drawImage(darkCanvas, 0, 0);
+    }
+
+    // 6. Sobreposição do Mestre (Paredes, Portas, Ícones de Luz)
+    ctx.save();
+    ctx.translate(camera.x, camera.y);
+    ctx.scale(camera.zoom, camera.zoom);
+
+    for (const w of state.walls) {
+      if (!isGM && !w.isDoor) continue;
+      ctx.beginPath();
+      ctx.moveTo(w.x1, w.y1);
+      ctx.lineTo(w.x2, w.y2);
+      if (w.isDoor) {
+        ctx.strokeStyle = w.open ? '#10b981' : '#f59e0b';
+        ctx.setLineDash(w.open ? [8, 6] : []);
+        ctx.lineWidth = 6 / camera.zoom;
+      } else {
+        ctx.strokeStyle = '#ef4444';
+        ctx.setLineDash([]);
+        ctx.lineWidth = 4 / camera.zoom;
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Pré-visualização da parede sendo desenhada
+    if (wallDraftStart) {
+      ctx.beginPath();
+      ctx.moveTo(wallDraftStart.x, wallDraftStart.y);
+      ctx.lineTo(mouseWorld.x, mouseWorld.y);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.setLineDash([6, 6]);
+      ctx.lineWidth = 3 / camera.zoom;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Marcadores de luz no modo Mestre
+    if (isGM) {
+      for (const l of state.lights) {
+        ctx.beginPath();
+        ctx.arc(l.x, l.y, 11 / camera.zoom, 0, Math.PI * 2);
+        ctx.fillStyle = '#f59e0b';
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2 / camera.zoom;
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+
+  function drawToken(t) {
+    const r = (state.gridSize * t.scale) / 2;
+    const isSel = selectedItem && selectedItem.kind === 'token' && selectedItem.id === t.id;
+
+    ctx.save();
+    ctx.translate(t.x, t.y);
+
+    // Indicador de direção da lanterna
+    if (t.type === 'character' && t.flashlight) {
+      const rad = (t.angle * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(rad) * r, Math.sin(rad) * r);
+      ctx.lineTo(Math.cos(rad) * (r + 12), Math.sin(rad) * (r + 12));
+      ctx.strokeStyle = '#fde047';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+
+    // Corpo do Token
+    ctx.beginPath();
+    if (t.type === 'object') {
+      ctx.roundRect(-r, -r, r * 2, r * 2, 8);
+    } else {
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = t.color;
+    ctx.fill();
+
+    // Imagem customizada se houver
+    if (t.imgData) {
+      if (!imageCache[t.imgData]) {
+        const img = new Image();
+        img.onload = () => render();
+        img.src = t.imgData;
+        imageCache[t.imgData] = img;
+      }
+      const img = imageCache[t.imgData];
+      if (img.complete) {
+        ctx.save();
+        ctx.clip();
+        ctx.drawImage(img, -r, -r, r * 2, r * 2);
+        ctx.restore();
+      }
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${Math.max(11, r * 0.75)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t.name.slice(0, 2).toUpperCase(), 0, 0);
+    }
+
+    // Borda de seleção
+    ctx.lineWidth = isSel ? 3.5 : 2;
+    ctx.strokeStyle = isSel ? '#38bdf8' : '#0f172a';
+    ctx.stroke();
+
+    // Rótulo com nome
+    ctx.fillStyle = 'rgba(11, 13, 18, 0.8)';
+    const textW = ctx.measureText(t.name).width + 10;
+    ctx.fillRect(-textW / 2, r + 4, textW, 16);
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = '11px sans-serif';
+    ctx.fillText(t.name, 0, r + 12);
+
+    ctx.restore();
+  }
+
+  // Exportar / Importar Cena JSON
+  function exportScene() {
+    const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'cena-novo-nilo.json';
+    a.click();
+  }
+
+  document.getElementById('import-scene').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const loaded = JSON.parse(ev.target.result);
+        state = { ...state, ...loaded };
+        document.getElementById('darkness-slider').value = state.darkness;
+        document.getElementById('grid-size').value = state.gridSize;
+        updateEnv();
+        if (state.mapDataUrl) {
+          loadMapFromDataUrl(state.mapDataUrl);
+        } else {
+          mapImage = null;
+          render();
+        }
+      } catch (err) {
+        alert('Arquivo de cena inválido.');
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  resize();
+  initDemoScene();
+  render();
+</script>
+</body>
+</html>
