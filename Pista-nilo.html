@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>[ARQUIVO CORROMPIDO] Sondagem Subsolo - Lote 1888 / Novo Nilo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse24bpm {
+      0%, 100% { opacity: 0.25; transform: scale(0.95); }
+      15% { opacity: 1; transform: scale(1.15); }
+      30% { opacity: 0.4; transform: scale(1); }
+    }
+    .pulso-ouro {
+      animation: pulse24bpm 2.5s infinite ease-in-out;
+      transform-origin: center;
+    }
+    @keyframes scanline {
+      0% { transform: translateY(-100%); }
+      100% { transform: translateY(100%); }
+    }
+    .scan-bar {
+      animation: scanline 4s linear infinite;
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-300 font-mono min-h-screen pb-16 selection:bg-amber-500 selection:text-black">
+
+  <!-- Barra de Arquivo Morto / Cache -->
+  <div class="bg-red-950/90 border-b border-red-800 px-4 py-2 text-xs text-red-200 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+      <strong>SNAPSHOT RECUPERADO (CACHE LOCAL)</strong> — Tópico original deletado pelo administrador.
+    </div>
+    <span class="text-red-400">ERRO DE SINCRONIA: 13/05/1888 00:00:00</span>
+  </div>
+
+  <main class="max-w-3xl mx-auto p-4 sm:p-6 space-y-6 mt-4">
+
+    <!-- Cabeçalho do Fórum -->
+    <header class="border-b border-zinc-800 pb-4 space-y-2">
+      <div class="text-[11px] text-zinc-500 uppercase tracking-widest">
+        Fórum Brasileiro de Geotecnia & Patrimônio &gt; Laudos de Subsolo &gt; #4092-NN
+      </div>
+      <h1 class="text-lg sm:text-xl font-bold text-zinc-100">
+        Leitura anômala no georradar — Ruínas da antiga Fazenda Alencar (Novo Nilo)
+      </h1>
+      <div class="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1 gap-2">
+        <div>
+          Autor: <span class="text-amber-400 font-bold">@sondagem_1305</span>
+          <span class="bg-zinc-900 border border-zinc-700 text-zinc-500 text-[10px] px-1.5 py-0.5 rounded ml-1">CONTA EXCLUÍDA</span>
+        </div>
+        <div class="text-zinc-500">Postado em: <span class="text-red-400">13/05/1888</span> (Última edição: há 4 min)</div>
+      </div>
+    </header>
+
+    <!-- Relato Técnico -->
+    <article class="bg-zinc-900/70 border border-zinc-800 rounded p-4 sm:p-5 space-y-4 text-sm leading-relaxed">
+      <p>
+        Alguém aqui já pegou interferência desse tipo usando GPR (Georradar de Penetração no Solo) de 400 MHz? Fui contratado para fazer a varredura preventiva do terreno ao redor das ruínas do casarão velho aqui em <strong class="text-zinc-100">Novo Nilo</strong> antes da prefeitura abrir as valas da rede pluvial.
+      </p>
+      <p>
+        Acontece que o equipamento simplesmente enlouqueceu quando passei perto da fundação principal. Em vez de retornar o eco normal de pedra e terra compactada, o sensor acusou uma <strong class="text-zinc-100">bolsa densa que absorve quase todo o sinal</strong> a partir de 2,5 metros de profundidade — parece um líquido espesso misturado com dezenas de estruturas ósseas presas bem debaixo dos alicerces.
+      </p>
+      <p>
+        O mais bizarro está a <strong class="text-amber-400">4 metros exatos de profundidade</strong>, no centro dessa massa: existem <strong class="text-amber-400">três objetos metálicos distintos, de altíssima densidade (leitura compatível com ouro puro)</strong>, dispostos formando um triângulo perfeito. Nenhum deles foi removido. Continuam lacrados sob a alvenaria antiga.
+      </p>
+
+      <!-- Visualizador do Georradar -->
+      <div class="bg-black border border-zinc-800 rounded-lg p-4 space-y-3 relative overflow-hidden">
+        <div class="flex justify-between items-center text-[11px] text-zinc-500 border-b border-zinc-900 pb-2">
+          <span>PERFIL GPR-400MHz // SETOR: FUNDAÇÃO CENTRAL</span>
+          <span class="text-amber-500 font-bold">PULSO ACÚSTICO DETECTADO: 24 BPM</span>
+        </div>
+
+        <!-- Gráfico SVG do Subsolo -->
+        <div class="relative w-full h-64 bg-zinc-950 border border-zinc-900 rounded overflow-hidden">
+          <div class="scan-bar absolute inset-0 bg-gradient-to-b from-transparent via-amber-500/10 to-transparent pointer-events-none"></div>
+          
+          <svg viewBox="0 0 600 240" class="w-full h-full">
+            <!-- Grade de profundidade -->
+            <line x1="0" y1="40" x2="600" y2="40" stroke="#27272a" stroke-dasharray="4" />
+            <text x="10" y="35" fill="#52525b" font-size="10">0.0m (SUPERFÍCIE / RUÍNAS)</text>
+
+            <line x1="0" y1="110" x2="600" y2="110" stroke="#27272a" stroke-dasharray="4" />
+            <text x="10" y="105" fill="#52525b" font-size="10">-2.0m (ALICERCE DE PEDRA)</text>
+
+            <line x1="0" y1="190" x2="600" y2="190" stroke="#27272a" stroke-dasharray="4" />
+            <text x="10" y="185" fill="#52525b" font-size="10">-4.0m (ANOMALIA DENSA)</text>
+
+            <!-- Camada de Terra e Pedras da Fundação -->
+            <rect x="80" y="45" width="440" height="35" fill="#18181b" stroke="#3f3f46" />
+            <text x="235" y="67" fill="#71717a" font-size="11">FUNDAÇÃO CASARÃO (1888)</text>
+
+            <!-- Massa Negra / Lodo e Ossadas -->
+            <path d="M 110 85 Q 300 70 490 85 Q 530 160 460 220 Q 300 235 140 220 Q 70 160 110 85 Z" fill="#09090b" stroke="#450a0a" stroke-width="2" />
+            <text x="205" y="125" fill="#991b1b" font-size="10" letter-spacing="1">[MASSA ORGÂNICA / ABSORÇÃO TOTAL DE SONAR]</text>
+
+            <!-- Os 3 Objetos de Ouro Enterrados (Tríade do Tempo) -->
+            <!-- Objeto 1: Topo (Cronômetro) -->
+            <circle cx="300" cy="148" r="14" fill="#f59e0b" fill-opacity="0.2" class="pulso-ouro" />
+            <circle cx="300" cy="148" r="5" fill="#fbbf24" />
+            <text x="315" y="151" fill="#fcd34d" font-size="10" font-weight="bold">ALVO A (Au 24k - 14°C)</text>
+
+            <!-- Objeto 2: Esquerda (Ampulheta) -->
+            <circle cx="220" cy="195" r="14" fill="#f59e0b" fill-opacity="0.2" class="pulso-ouro" />
+            <circle cx="220" cy="195" r="5" fill="#fbbf24" />
+            <text x="115" y="198" fill="#fcd34d" font-size="10" font-weight="bold">ALVO B (Au 24k)</text>
+
+            <!-- Objeto 3: Direita (Anel) -->
+            <circle cx="380" cy="195" r="14" fill="#f59e0b" fill-opacity="0.2" class="pulso-ouro" />
+            <circle cx="380" cy="195" r="5" fill="#fbbf24" />
+            <text x="395" y="198" fill="#fcd34d" font-size="10" font-weight="bold">ALVO C (Au 24k)</text>
+
+            <!-- Linhas de conexão da Tríade -->
+            <polygon points="300,148 220,195 380,195" fill="none" stroke="#d97706" stroke-width="1" stroke-dasharray="3" opacity="0.6" />
+          </svg>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-[11px] text-center pt-1">
+          <div class="bg-zinc-900/90 p-2 rounded border border-zinc-800">
+            <span class="text-zinc-500 block">PROFUNDIDADE</span>
+            <strong class="text-zinc-200">4,12 metros</strong>
+          </div>
+          <div class="bg-zinc-900/90 p-2 rounded border border-zinc-800">
+            <span class="text-zinc-500 block">TEMP. TÉRMICA</span>
+            <strong class="text-cyan-400">14,0 °C (Anômala)</strong>
+          </div>
+          <div class="bg-zinc-900/90 p-2 rounded border border-zinc-800">
+            <span class="text-zinc-500 block">FREQUÊNCIA</span>
+            <strong class="text-amber-400">24 BPM (Sincronizado)</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edição Corrompida antes da exclusão -->
+      <div class="border-l-2 border-red-700 pl-4 py-1 bg-red-950/20 space-y-2 text-xs text-zinc-300">
+        <div class="text-[10px] text-red-400 font-bold uppercase">
+          [EDITADO PELO AUTOR ANTES DA EXCLUSÃO DA CONTA]
+        </div>
+        <p>
+          Esquece o que eu perguntei sobre calibração. A bateria do meu notebook caiu de 90% pra 4% em segundos e o relógio do Windows travou em 1888.
+        </p>
+        <p>
+          O pior não é o aparelho: dá pra ouvir metal raspando e corrente arrastando lá de baixo toda vez que o pulso bate. A terra em volta das pedras tá minando um óleo preto que não tem cheiro de nada. Eu não vou assinar o laudo de liberação. Se a prefeitura meter retroescavadeira aqui amanhã e romper essa fundação, ninguém nessa cidade vai
+        </p>
+        <p class="text-red-500 font-bold tracking-wider">
+          [FIM DO REGISTRO — CONEXÃO INTERROMPIDA]
+        </p>
+      </div>
+    </article>
+
+    <!-- Rodapé / Gancho Direto para o Gabriel -->
+    <footer class="bg-zinc-900 border border-amber-900/50 rounded p-4 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div class="space-y-1">
+        <span class="text-amber-500 font-bold block">ENCAMINHADO VIA REDE PRIVADA</span>
+        <span class="text-zinc-400">Destinatário registrado no cabeçalho do pacote: <strong class="text-zinc-100">GABRIEL</strong></span>
+      </div>
+      <div class="text-[11px] text-zinc-500 font-mono">
+        COORD: 05°05'S 42°48'W // NOVO NILO
+      </div>
+    </footer>
+
+  </main>
+</body>
+</html>
